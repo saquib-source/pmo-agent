@@ -1,0 +1,23 @@
+apiVersion: isrds.agent/v1
+kind: GovernanceRules
+agent_id: REPLACE-must-match-spec
+invariants:
+  - id: no-vendor-in-runtime
+    rule: "No action may select or hardcode a runtime engine; engine is config-resolved."
+    on_violation: deny
+  - id: irreversible-requires-approve
+    rule: "Any action with irreversible:true in the tool registry requires an Approve gate."
+    on_violation: gate
+    gate: Approve
+  - id: trust-ledger-audit
+    rule: "Every decision and every tool call is written append-only to the Trust Ledger."
+    on_violation: deny                  # see references/08-authority-and-trust-ledger.md
+rules:
+  - action: REPLACE-tool-id.REPLACE-action
+    decision: allow                     # allow | gate | deny
+    rationale: "REPLACE — required on every rule"
+escalation:
+  - condition: "REPLACE — e.g. budget_threshold_exceeded"
+    gate: Escalate
+    to: REPLACE-supervisor
+    rationale: "Exceeds agent authority."

@@ -1,0 +1,39 @@
+apiVersion: isrds.agent/v1
+kind: GovernanceRules
+agent_id: pmo-agent
+invariants:
+  - id: no-vendor-in-runtime
+    rule: "No action may select or hardcode a runtime engine; engine is config-resolved."
+    on_violation: deny
+  - id: irreversible-requires-approve
+    rule: "Any action with irreversible:true in the tool registry requires an Approve gate."
+    on_violation: gate
+    gate: Approve
+  - id: trust-ledger-audit
+    rule: "Every decision and every tool call is written append-only to the Trust Ledger."
+    on_violation: deny                    # FR-7 / BaseRoleAgent consistency
+                                          # see references/08-authority-and-trust-ledger.md
+rules:
+  - action: workorder_db.query_workorders
+    decision: allow
+    rationale: "Read-only internal query against PostgreSQL via MCP; no blast radius."
+  - action: jira.read_issues
+    decision: allow
+    rationale: "Read-only Jira state for operating-picture synthesis; no blast radius."
+  - action: jira.comment_issue
+    decision: gate
+    gate: Review
+    rationale: "External-facing artifact; DECIDE_AND_REPORT authority requires human gate."
+  - action: jira.set_field
+    decision: gate
+    gate: Approve
+    rationale: "Modifying Jira field state is a reversible external write; authority ceiling demands gate."
+escalation:
+  - condition: "budget_threshold_exceeded"
+    gate: Escalate
+    to: Founder
+    rationale: "Budget at 90%+ exceeds agent authority; Founder decides."
+  - condition: "blocker_aged_72h"
+    gate: Escalate
+    to: COO
+    rationale: "3-day-old blocker implies organizational impediment beyond agent scope."

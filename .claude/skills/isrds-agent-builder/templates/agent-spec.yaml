@@ -1,0 +1,45 @@
+apiVersion: isrds.agent/v1
+kind: AgentSpec
+metadata:
+  agent_id: REPLACE-kebab-case-id        # stable; used in config_registry.resolve()
+  display_name: REPLACE Display Name
+  tier: 1                                # informational only; NOT the proving selector
+  division: "REPLACE e.g. 5.0 Runtime"
+  department: REPLACE
+  owner: REPLACE
+  version: 0.1.0
+spec:
+  purpose: >
+    REPLACE — one honest, narrow paragraph. What operating reality this agent
+    externalizes or automates. A sprawling purpose cannot be governed in Phase 3.
+  engine_binding:
+    resolution: "config_registry.resolve(tenant_id, agent_id)"   # NEVER name a model here
+  authority: DECIDE_AND_REPORT           # OBSERVE_ONLY | DECIDE_AND_REPORT | ACT_WITH_REVIEW | ACT_AUTONOMOUS
+                                         # see references/08-authority-and-trust-ledger.md
+  # build:                               # OPTIONAL — required when posture is "absorb"
+  #   posture: absorb                    # new | absorb (see references/07-build-posture.md)
+  #   codebase: "REPLACE — path/repo of the existing runtime"
+  #   extends: BaseRoleAgent             # absorb only
+  #   role_category: REPLACE             # the new Role Category name (absorb only)
+  #   config_registry_seed: REPLACE.sql  # migration that adds this agent's Config Registry row
+  #   reuse: [config_registry, authority_gradient, trust_ledger, pgvector_memory]
+  tenants:
+    - isrds                              # tenant 1 always proves first
+  inputs:
+    - name: REPLACE
+      source: postgres                   # postgres | firestore | bigquery | agent_engine
+      contract: "REPLACE — shape of the input"
+  outputs:
+    - name: REPLACE
+      sink: postgres
+      contract: "REPLACE — shape of the output"
+  tools:                                 # ids only; defined in tool-registry.yaml
+    - REPLACE-tool-id
+  refs:
+    prompt: prompt.md
+    tools: tool-registry.yaml
+    memory: memory-schema.json
+    governance: governance-rules.yaml
+    workflow: workflow-definition.yaml
+  gates:                                 # configured in Phase 5
+    - Review

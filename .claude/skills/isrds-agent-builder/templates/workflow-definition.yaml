@@ -1,0 +1,27 @@
+apiVersion: isrds.agent/v1
+kind: WorkflowDefinition
+agent_id: REPLACE-must-match-spec
+triggers:
+  # Use schedule for calendar-shaped work, events for event-shaped work, or both.
+  schedule:
+    - cron: "0 7 * * 1-5"               # REPLACE or delete if purely event-driven
+      timezone: "America/Chicago"
+  events:
+    - signal: REPLACE                   # e.g. verified_closeout, milestone_slip
+      source: pubsub
+contracts:
+  input:  { ref: "agent-spec.yaml#/spec/inputs" }
+  output: { ref: "agent-spec.yaml#/spec/outputs" }
+steps:
+  - id: REPLACE
+    tool: REPLACE-tool-id
+    action: REPLACE
+    # gate: Review                      # attach a gate where a human must intervene
+gates:
+  - type: Review
+    supervisor: REPLACE
+    sla: 30m
+  # - type: Approve
+  #   supervisor: REPLACE
+  #   sla: none                         # Approve NEVER has a timeout
+  #   applies_to: ["REPLACE irreversible actions"]

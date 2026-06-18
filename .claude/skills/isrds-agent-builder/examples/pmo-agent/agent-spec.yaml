@@ -1,0 +1,60 @@
+apiVersion: isrds.agent/v1
+kind: AgentSpec
+metadata:
+  agent_id: pmo-agent
+  display_name: PMO Agent
+  tier: 1
+  division: "5.0 Runtime"
+  department: PMO
+  owner: Manmeet
+  version: 0.2.0
+spec:
+  purpose: >
+    Tracks all active ISRDS projects, surfaces blockers and at-risk milestones, and
+    externalizes the operating picture currently living in the founder's head. Reads
+    dual feeds (Firestore work-order records and Jira issue state), decides what is
+    at-risk using judgment rules, and reports — never writes externally without a gate.
+  engine_binding:
+    resolution: "config_registry.resolve(tenant_id, agent_id)"
+  authority: DECIDE_AND_REPORT            # reads, reasons, reports; never auto-posts
+                                          # see references/08-authority-and-trust-ledger.md
+  build:
+    posture: absorb                       # absorb into existing codebase
+    codebase: "isrd/agents"               # existing ISRDS runtime repository
+    extends: BaseRoleAgent                # inherits audit, Authority Gradient, Trust Ledger
+    role_category: PMO                    # the new Role Category name
+    config_registry_seed: 004_seed_pmo.sql  # migration that adds this agent's Config Registry row
+    reuse:                                # primitives extended, never rebuilt
+      - config_registry
+      - authority_gradient
+      - trust_ledger
+      - pgvector_memory
+  tenants:
+    - isrds
+  inputs:
+    - name: active_projects
+      source: postgres
+      contract: "project[] with id, milestone, status, budget, owner"
+    - name: jira_issues
+      source: postgres                    # via MCP server, not direct Firestore
+      contract: "issue[] with key, status, assignee, updated_at, labels"
+  outputs:
+    - name: operating_picture
+      sink: postgres
+      contract: "daily digest with at-risk milestones, blocker list, budget warnings"
+    - name: escalation_alerts
+      sink: postgres
+      contract: "escalation[] with severity, condition, recommended_action"
+  tools:
+    - workorder_db
+    - jira
+  refs:
+    prompt: prompt.md
+    tools: tool-registry.yaml
+    memory: memory-schema.json
+    governance: governance-rules.yaml
+    workflow: workflow-definition.yaml
+  gates:
+    - Review
+    - Escalate
+    - Approve

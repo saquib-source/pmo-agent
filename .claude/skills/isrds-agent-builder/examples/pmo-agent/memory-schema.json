@@ -1,0 +1,44 @@
+{
+  "apiVersion": "isrds.agent/v1",
+  "kind": "MemorySchema",
+  "agent_id": "pmo-agent",
+  "store": "vertex_agent_engine",
+  "tenant_isolation": true,
+  "fields": [
+    {
+      "name": "last_run_at",
+      "type": "timestamp",
+      "purpose": "cross-run continuity; avoids re-processing the same window",
+      "destination_justification": "agent state between runs — correctly in Agent Engine"
+    },
+    {
+      "name": "open_flags",
+      "type": "array<flag>",
+      "purpose": "milestones already flagged, prevents duplicate escalations",
+      "destination_justification": "agent context for dedup, not a business record"
+    },
+    {
+      "name": "escalation_state",
+      "type": "map<string, escalation>",
+      "purpose": "tracks which escalations are active/pending/resolved for RACI routing",
+      "destination_justification": "transient agent routing state, not durable business record"
+    }
+  ],
+  "explicitly_not_in_memory": [
+    {
+      "data": "project_records",
+      "correct_destination": "postgres",
+      "reason": "durable relational records queried by EASS and other agents"
+    },
+    {
+      "data": "trust_ledger_entries",
+      "correct_destination": "postgres",
+      "reason": "append-only audit trail; must survive agent restarts and be queryable"
+    },
+    {
+      "data": "operating_picture_archive",
+      "correct_destination": "postgres",
+      "reason": "historical digests are business records for trend analysis"
+    }
+  ]
+}

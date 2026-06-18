@@ -1,0 +1,22 @@
+apiVersion: isrds.agent/v1
+kind: ToolRegistry
+agent_id: REPLACE-must-match-spec
+tools:
+  - id: REPLACE-tool-id                 # matches agent-spec.yaml and prompt.md
+    integration: mcp                    # mcp (default) | custom (only if no MCP server exists)
+    mcp:
+      server: REPLACE                   # e.g. atlassian (JIRA), postgres, slack
+      registered_via: cloud_api_registry
+      scopes: [REPLACE-least-privilege]
+    actions:
+      - name: REPLACE
+        irreversible: false             # true → forces an Approve gate in Phase 5
+  # Custom connector ONLY when no MCP server is published for the tool:
+  # - id: REPLACE
+  #   integration: custom
+  #   custom:
+  #     type: adk_custom_tool
+  #     note: "No MCP server exists; revisit if one appears."
+  #   actions:
+  #     - name: REPLACE
+  #       irreversible: true

@@ -1,0 +1,30 @@
+apiVersion: isrds.agent/v1
+kind: ToolRegistry
+agent_id: pmo-agent
+tools:
+  - id: workorder_db
+    integration: mcp
+    mcp:
+      server: postgres
+      registered_via: cloud_api_registry
+      scopes: [select]
+    actions:
+      - name: query_workorders
+        irreversible: false
+        description: "Reads active project records — milestones, budgets, blockers."
+  - id: jira
+    integration: mcp
+    mcp:
+      server: atlassian
+      registered_via: cloud_api_registry
+      scopes: [read:issues, write:comments, write:fields]
+    actions:
+      - name: read_issues
+        irreversible: false
+        description: "Reads Jira issue state for operating-picture synthesis."
+      - name: comment_issue
+        irreversible: false
+        description: "Posts a comment on a Jira issue (Review-gated)."
+      - name: set_field
+        irreversible: true
+        description: "Sets a field value on a Jira issue (Approve-gated; external write)."

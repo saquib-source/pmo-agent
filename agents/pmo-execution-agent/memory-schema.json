@@ -1,0 +1,50 @@
+{
+  "apiVersion": "isrds.agent/v1",
+  "kind": "MemorySchema",
+  "agent_id": "pmo-execution-agent",
+  "store": "vertex_agent_engine",
+  "tenant_isolation": true,
+  "fields": [
+    {
+      "name": "last_brief_at",
+      "type": "timestamp",
+      "purpose": "when the last Operating Brief was generated — prevents duplicate runs",
+      "destination_justification": "scheduling state for the agent, not a business record"
+    },
+    {
+      "name": "previously_flagged_tickets",
+      "type": "array<string>",
+      "purpose": "ticket keys already flagged in the current day to prevent duplicate alerts",
+      "destination_justification": "dedup context for same-day runs, cleared daily"
+    },
+    {
+      "name": "pending_chase_drafts",
+      "type": "array<draft>",
+      "purpose": "drafted pings awaiting Review gate approval",
+      "destination_justification": "transient agent queue state, cleared once approved/rejected"
+    },
+    {
+      "name": "escalation_tracker",
+      "type": "map<string, escalation_state>",
+      "purpose": "which tickets have been escalated and their gate status",
+      "destination_justification": "routing state for RACI ladder, not a business record"
+    }
+  ],
+  "explicitly_not_in_memory": [
+    {
+      "data": "operating_briefs",
+      "correct_destination": "postgres",
+      "reason": "historical briefs are business records for trend analysis and audit"
+    },
+    {
+      "data": "trust_ledger_entries",
+      "correct_destination": "postgres",
+      "reason": "append-only audit trail must survive agent restarts"
+    },
+    {
+      "data": "jira_snapshots",
+      "correct_destination": "postgres",
+      "reason": "point-in-time Jira state for historical staleness analysis"
+    }
+  ]
+}

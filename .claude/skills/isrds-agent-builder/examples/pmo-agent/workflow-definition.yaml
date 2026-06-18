@@ -1,0 +1,58 @@
+apiVersion: isrds.agent/v1
+kind: WorkflowDefinition
+agent_id: pmo-agent
+triggers:
+  schedule:
+    - cron: "0 7 * * 1-5"
+      timezone: "America/Chicago"
+      description: "Weekday morning operating picture generation"
+  events:
+    - signal: milestone_slip
+      source: pubsub
+      description: "Triggered when a milestone forecast date passes its committed date"
+    - signal: budget_threshold_exceeded
+      source: pubsub
+      description: "Triggered when project spend reaches 90%+ of allocation"
+    - signal: blocker_aged_24h
+      source: pubsub
+      description: "Triggered when a blocker has been open for 24+ hours"
+contracts:
+  input:  { ref: "agent-spec.yaml#/spec/inputs" }
+  output: { ref: "agent-spec.yaml#/spec/outputs" }
+steps:
+  - id: gather_workorders
+    tool: workorder_db
+    action: query_workorders
+    description: "Pull active projects, milestones, budgets, blockers from PostgreSQL"
+  - id: gather_jira
+    tool: jira
+    action: read_issues
+    description: "Pull current Jira issue state for cross-reference"
+  - id: analyze
+    description: "Apply judgment rules to identify at-risk milestones, aged blockers, budget warnings"
+  - id: compose_digest
+    description: "Build the operating picture and escalation alerts"
+  - id: distribute_digest
+    tool: jira
+    action: comment_issue
+    gate: Review
+    description: "Post digest to relevant Jira tickets (Review-gated)"
+  - id: chase_owners
+    tool: jira
+    action: set_field
+    gate: Approve
+    description: "Set fields on Jira issues to chase owners (Approve-gated; irreversible)"
+gates:
+  - type: Review
+    supervisor: COO
+    sla: 30m
+    description: "COO reviews digest before external distribution"
+  - type: Escalate
+    supervisor: Founder
+    sla: 2h
+    description: "Founder reviews budget/blocker escalations"
+  - type: Approve
+    supervisor: Founder
+    sla: none
+    applies_to: ["jira.set_field", "all external communications"]
+    description: "Hard-stop for irreversible Jira writes; no timeout"

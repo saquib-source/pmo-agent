@@ -1,0 +1,64 @@
+# Python virtual environments
+.venv/
+venv/
+env/
+
+# Python cache / compiled
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# Environment files (NEVER commit secrets)
+.env
+.env.*
+!.env.template
+!.env.example
+
+# JSON (selective)
+*.json
+!**/package.json
+!**/tsconfig.json
+!**/memory-schema.json
+
+# JSONL
+trust-ledger.jsonl
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+logs/
+*.log
+
+# Certificates / secrets / service account keys
+*.pem
+*.key
+*.crt
+*.p12
+isr-division-systems-*.json
+
+# ADK runtime artifacts
+.adk/
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Briefs (runtime generated)
+**/briefs/
+
+# Node (if applicable)
+node_modules/
