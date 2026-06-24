@@ -130,6 +130,21 @@ async def _run_prompt(prompt: str, session_id: str) -> str:
     """Send a prompt to the orchestrator and collect the full response."""
     if _runner is None:
         raise RuntimeError("Runner not initialised — call _startup() first")
+
+    # ADK requires the session to exist before run_async can use it.
+    # get_session returns None (not an exception) when not found.
+    existing = await _session_service.get_session(
+        app_name="pmo_swarm",
+        user_id="pmo_daemon",
+        session_id=session_id,
+    )
+    if existing is None:
+        await _session_service.create_session(
+            app_name="pmo_swarm",
+            user_id="pmo_daemon",
+            session_id=session_id,
+        )
+
     message = Content(role="user", parts=[Part(text=prompt)])
     full_response = []
 
@@ -210,12 +225,25 @@ async def run_cycle(mode: str = "full") -> str:
     start = datetime.now(timezone.utc)
     session_id = f"daemon-{start.strftime('%Y%m%d%H%M%S')}"
 
-    log.info("=" * 60)
-    log.info(f"PMO Swarm cycle — {start.strftime('%Y-%m-%d %H:%M:%S')} UTC")
-    log.info("=" * 60)
+    log.info("=" * 80)
+    log.info(f"🚀 PMO SWARM CYCLE START — {start.strftime('%Y-%m-%d %H:%M:%S')} UTC")
+    log.info("=" * 80)
+    log.info(f"📋 Mode: {mode}")
+    log.info(f"🏗️  Projects: {', '.join(JIRA_PROJECTS) if JIRA_PROJECTS else 'ISRDS'}")
+    log.info(f"📊 Config: scan_interval={SCAN_INTERVAL}min | brief_hour={BRIEF_HOUR}:00 | auto_comment={AUTO_COMMENT}")
+    log.info(f"🔄 Session ID: {session_id}")
+    log.info("-" * 80)
+    log.info("📌 Active Agents:")
+    log.info("   1️⃣  execution_tracking_agent (DECIDE_AND_REPORT) — scan for stalled tickets")
+    log.info("   2️⃣  follow_up_agent (MUST_ESCALATE) — draft chase messages")
+    log.info("   3️⃣  ownership_raci_agent (MUST_ESCALATE) — audit RACI gaps")
+    log.info("   4️⃣  feature_completeness_agent (DECIDE_AND_REPORT) — track feature build progress")
+    log.info("   5️⃣  hygiene_agent (DECIDE_AND_REPORT) — detect field/status violations")
+    log.info("-" * 80)
 
     prompt = _build_brief_prompt(mode)
-    log.info(f"Prompt: {prompt[:120]}...")
+    log.info(f"🎯 Prompt (full): {prompt}")
+    log.info("-" * 80)
 
     # Layer 8 — trace the full swarm run in Cloud Logging + Monitoring
     try:
@@ -230,33 +258,50 @@ async def run_cycle(mode: str = "full") -> str:
 
     elapsed = (datetime.now(timezone.utc) - start).total_seconds()
 
+    log.info("-" * 80)
+    log.info("📝 ORCHESTRATOR RESPONSE:")
+    log.info(response[:500] + ("..." if len(response) > 500 else ""))
+    log.info("-" * 80)
+
     # Save brief — local file (always)
     ts = start.strftime("%Y%m%d_%H%M%S")
     brief_path = BRIEF_DIR / f"brief_{ts}.txt"
     brief_path.write_text(response)
     (BRIEF_DIR / "latest.txt").write_text(response)
 
-    log.info(f"Brief saved → briefs/brief_{ts}.txt  ({elapsed:.1f}s)")
+    log.info(f"✅ Brief saved → briefs/brief_{ts}.txt")
+    log.info(f"⏱️  Execution time: {elapsed:.2f} seconds")
     observability.record_metric("briefs_generated_total", 1.0, labels={"mode": mode})
 
     # BigQuery — primary: Operating Brief (system of record) + cycle KPIs
-    await log_operating_brief(
-        cycle_ts=start,
-        mode=mode,
-        brief_text=response,
-        duration_ms=elapsed * 1000,
-    )
-    await log_cycle_metrics(
-        cycle_ts=start,
-        mode=mode,
-        projects=JIRA_PROJECTS,
-        duration_ms=elapsed * 1000,
-    )
-    log.info(f"Brief + cycle metrics written to BigQuery isrds_pmo")
+    try:
+        await log_operating_brief(
+            cycle_ts=start,
+            mode=mode,
+            brief_text=response,
+            duration_ms=elapsed * 1000,
+        )
+        log.info("📊 Operating Brief logged to BigQuery")
+    except Exception as e:
+        log.warning(f"BigQuery brief write failed: {e}")
+
+    try:
+        await log_cycle_metrics(
+            cycle_ts=start,
+            mode=mode,
+            projects=JIRA_PROJECTS,
+            duration_ms=elapsed * 1000,
+        )
+        log.info("📈 Cycle metrics logged to BigQuery")
+    except Exception as e:
+        log.warning(f"BigQuery metrics write failed: {e}")
 
     # AlloyDB — backup: daily_briefings (kept for operational fast reads)
     await _save_brief_to_db(start.date(), response, elapsed)
 
+    log.info("=" * 80)
+    log.info(f"✨ PMO SWARM CYCLE COMPLETE — {elapsed:.2f}s total")
+    log.info("=" * 80)
     print("\n" + response + "\n")
     return response
 
