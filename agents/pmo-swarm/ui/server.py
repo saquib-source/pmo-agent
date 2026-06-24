@@ -208,15 +208,17 @@ async def pending_gates(last_n: int = 300):
 
 # ── HTML rendering ──────────────────────────────────────────────────────────
 
-def _page(body: str, stats: dict | None = None) -> str:
+def _page(body: str, stats: dict | None = None, show_stats: bool = True) -> str:
     stats = stats or {}
     chips = ""
-    for label, val in [("Pending", stats.get("pending", 0)),
-                       ("Agents", stats.get("agents", 6)),
-                       ("Briefs", stats.get("briefs", 0)),
-                       ("Decisions", stats.get("decisions", 0))]:
-        chips += (f'<div class="stat"><div class="stat-v">{val}</div>'
-                  f'<div class="stat-l">{label}</div></div>')
+    if show_stats:
+        for label, val in [("Pending", stats.get("pending", 0)),
+                           ("Agents", stats.get("agents", 6)),
+                           ("Briefs", stats.get("briefs", 0)),
+                           ("Decisions", stats.get("decisions", 0))]:
+            chips += (f'<div class="stat"><div class="stat-v">{val}</div>'
+                      f'<div class="stat-l">{label}</div></div>')
+        chips = f'<div class=stats>{chips}</div>'
     return f"""<!doctype html><html lang=en><head><meta charset=utf-8>
 <meta name=viewport content="width=device-width,initial-scale=1">
 <title>PMO Swarm Control · ISRDS</title>
@@ -266,6 +268,12 @@ main{{max-width:1080px;margin:0 auto;padding:32px 24px 64px}}
 .tk{{font-weight:700;color:var(--accent-text);font-size:15px}}
 .badge{{font-size:11px;font-weight:600;padding:3px 10px;border-radius:var(--radius-pill);
   background:var(--surface);border:1px solid var(--border);color:var(--text-2);text-transform:capitalize}}
+.chip{{display:inline-block;font-size:11px;font-weight:600;padding:2px 9px;border-radius:var(--radius-pill);
+  margin-right:8px;vertical-align:1px;white-space:nowrap}}
+.chip.ok{{background:var(--ok-soft);color:var(--ok)}}
+.chip.warn{{background:rgba(180,83,9,.1);color:var(--warn)}}
+.chip.info{{background:rgba(37,99,235,.08);color:#2563eb}}
+.chip.muted{{background:var(--surface-2);color:var(--text-3);border:1px solid var(--border)}}
 .msg{{color:var(--text);font-size:15px;margin:8px 0 16px;line-height:1.6}}
 .msg .lbl{{display:block;font-size:11px;font-weight:600;text-transform:uppercase;
   letter-spacing:.06em;color:var(--text-3);margin-bottom:6px}}
@@ -297,7 +305,29 @@ pre{{white-space:pre-wrap;background:var(--bg);border:1px solid var(--border);pa
 .muted{{color:var(--text-3);font-size:13px}}
 .empty{{color:var(--text-3);font-style:italic;padding:8px 0}}
 .run-row{{display:flex;align-items:center;gap:16px;flex-wrap:wrap}}
-@media(max-width:680px){{.stats{{grid-template-columns:repeat(2,1fr)}}main{{padding:20px 16px 48px}}}}
+.agent-grid{{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}}
+.agent-card{{display:flex;flex-direction:column;gap:12px;background:var(--surface);
+  border:1px solid var(--border);border-radius:var(--radius-nested);padding:18px 20px;
+  transition:border-color .15s,box-shadow .15s}}
+.agent-card:hover{{border-color:var(--accent);box-shadow:var(--shadow)}}
+.ac-top{{display:flex;align-items:center;gap:12px}}
+.ac-top .ico{{font-size:24px}}.ac-name{{flex:1;min-width:0}}
+.ac-name b{{display:block;font-size:16px}}.ac-name .desc{{font-size:12px;color:var(--text-3)}}
+.ac-sum{{font-size:14px;color:var(--text-2);line-height:1.5}}
+.ac-foot{{display:flex;justify-content:space-between;align-items:center;
+  border-top:1px solid var(--border);padding-top:12px}}
+.ac-foot .link{{font-size:13px;font-weight:600;color:var(--accent-text)}}
+.back{{display:inline-block;font-size:14px;font-weight:600;color:var(--text-2);margin-bottom:16px}}
+.back:hover{{color:var(--text)}}
+.agent-hero{{display:flex;gap:20px;align-items:flex-start}}
+.hero-ico{{font-size:48px;line-height:1}}
+.agent-hero h1{{font-size:28px;font-weight:700;margin:0;letter-spacing:-.02em}}
+.hero-role{{font-size:13px;font-weight:600;color:var(--accent-text);text-transform:uppercase;
+  letter-spacing:.06em;margin-top:4px}}
+.hero-what{{font-size:16px;color:var(--text-2);margin:12px 0 0;max-width:60ch}}
+.stats4{{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}}
+@media(max-width:680px){{.stats,.stats4,.agent-grid{{grid-template-columns:repeat(1,1fr)}}
+  main{{padding:20px 16px 48px}}.agent-hero{{flex-direction:column;gap:12px}}}}
 </style></head><body>
 <div class=topbar>
   <div class=brand>
@@ -308,7 +338,7 @@ pre{{white-space:pre-wrap;background:var(--bg);border:1px solid var(--border);pa
   <a class=refresh href="/">Refresh</a>
 </div>
 <main>
-  <div class=stats>{chips}</div>
+  {chips}
   {body}
 </main></body></html>"""
 
@@ -363,52 +393,38 @@ async def home(msg: str = "", kind: str = ""):
     else:
         pend = "<p class=empty>No pending approvals. 🎉</p>"
 
-    # Map the agent_id used in the ledger → friendly icon+name+description
-    AGENT_META = {
-        "pmo_orchestrator":            ("🧭", "Orchestrator", "Routes work, enforces gates, writes the brief."),
-        "pmo_execution_tracking":      ("1️⃣", "Execution Tracking", "Scans boards for stalled / at-risk tickets."),
-        "execution_tracking_agent":    ("1️⃣", "Execution Tracking", "Scans boards for stalled / at-risk tickets."),
-        "pmo_follow_up":               ("2️⃣", "Follow-up & Escalation", "Drafts chase & escalation messages (gated)."),
-        "follow_up_agent":             ("2️⃣", "Follow-up & Escalation", "Drafts chase & escalation messages (gated)."),
-        "pmo_ownership_raci":          ("3️⃣", "Ownership / RACI", "Resolves who is Accountable & Responsible."),
-        "ownership_raci_agent":        ("3️⃣", "Ownership / RACI", "Resolves who is Accountable & Responsible."),
-        "pmo_feature_completeness":    ("4️⃣", "Feature Completeness", "Tracks feature build completion."),
-        "feature_completeness_agent":  ("4️⃣", "Feature Completeness", "Tracks feature build completion."),
-        "pmo_hygiene":                 ("5️⃣", "Hygiene", "Detects field/status hygiene violations."),
-        "hygiene_agent":               ("5️⃣", "Hygiene", "Detects field/status hygiene violations."),
-        "human":                       ("🧑", "Human (you)", "Approvals & declines via this UI."),
-    }
+    def _agent_card(agent_id, acts):
+        icon, name, desc = AGENT_META.get(agent_id, ("🤖", agent_id, ("", "")))[:2] + \
+                           (AGENT_META.get(agent_id, ("", "", ""))[2],)
+        summary = _summarize(agent_id, acts)
+        last_ts = acts[0]["ts"] if acts else "—"
+        return (f'<a class="agent-card" href="/agent/{_canon(agent_id)}">'
+                f'<div class=ac-top><span class=ico>{icon}</span>'
+                f'<div class=ac-name><b>{name}</b><span class=desc>{desc}</span></div>'
+                f'<span class=badge>{len(acts)}</span></div>'
+                f'<div class=ac-sum>{summary}</div>'
+                f'<div class=ac-foot><span class=muted>Last activity {last_ts}</span>'
+                f'<span class=link>View dashboard →</span></div></a>')
 
-    def _agent_block(agent_id, acts):
-        icon, name, desc = AGENT_META.get(agent_id, ("🤖", agent_id, ""))
-        recent = "".join(
-            f"<div class=row><span class=t>{a['event']} · {a['detail'][:160]}</span>"
-            f"<span class=ts>{a['ts']}</span></div>"
-            for a in acts[:10])
-        return (f"<details><summary><span class=ico>{icon}</span>"
-                f"<b>{name}</b><span class=badge>{len(acts)} actions</span>"
-                f"<span class=desc>{desc}</span></summary>"
-                f"<div class=body>{recent or '<p class=empty>No recorded actions yet.</p>'}</div>"
-                f"</details>")
+    # Collapse duplicate ids (canonical) so each agent appears once on the grid.
+    merged = {}
+    for aid, acts in activity.items():
+        merged.setdefault(_canon(aid), []).extend(acts)
+    for acts in merged.values():
+        acts.sort(key=lambda a: a["ts"], reverse=True)
 
-    # Order: orchestrator first, then numbered sub-agents, then human, then anything else
-    order = ["pmo_orchestrator", "pmo_execution_tracking", "execution_tracking_agent",
-             "pmo_follow_up", "follow_up_agent", "pmo_ownership_raci", "ownership_raci_agent",
-             "pmo_feature_completeness", "feature_completeness_agent",
-             "pmo_hygiene", "hygiene_agent", "human"]
+    order = ["pmo_orchestrator", "execution_tracking_agent", "follow_up_agent",
+             "ownership_raci_agent", "feature_completeness_agent", "hygiene_agent", "human"]
     seen_agents, agents_html = set(), ""
     for aid in order:
-        if aid in activity and aid not in seen_agents:
-            agents_html += _agent_block(aid, activity[aid]); seen_agents.add(aid)
-    for aid, acts in activity.items():
+        if aid in merged and aid not in seen_agents:
+            agents_html += _agent_card(aid, merged[aid]); seen_agents.add(aid)
+    for aid, acts in merged.items():
         if aid not in seen_agents:
-            agents_html += _agent_block(aid, acts); seen_agents.add(aid)
+            agents_html += _agent_card(aid, acts); seen_agents.add(aid)
     if not agents_html:
-        agents_html = "".join(
-            f"<div class=agent><div style=font-size:20px>{i.split(' ')[0]}</div>"
-            f"<div><b>{' '.join(i.split(' ')[1:])}</b><span class=role>{r}</span>"
-            f"<span class=desc>{d}</span></div></div>"
-            for i, r, d in AGENTS)
+        agents_html = "<p class=empty>No agent activity yet. Run a cycle to populate.</p>"
+    agents_html = f'<div class=agent-grid>{agents_html}</div>'
 
     briefs_html = "".join(
         f"<details><summary><span class=ico>📄</span>"
@@ -418,8 +434,8 @@ async def home(msg: str = "", kind: str = ""):
         for b in briefs) or "<p class=empty>No briefs yet. Run a cycle below.</p>"
 
     led_html = "".join(
-        f"<div class=row><span class=t>{(e.get('event_type') or e.get('type') or '')} · "
-        f"{_evidence_str(e)}</span>"
+        f"<div class=row><span class=t>{_event_chip(e.get('event_type') or e.get('type') or '')}"
+        f"{_clean_detail(_evidence_str(e))}</span>"
         f"<span class=ts>{str(e.get('created_at',''))[:19]}</span></div>"
         for e in ledger) or "<p class=empty>No ledger entries.</p>"
 
@@ -457,9 +473,98 @@ async def home(msg: str = "", kind: str = ""):
     <div class=card><h2>Operating Briefs</h2>{briefs_html}</div>
     <div class=card><h2>Trust Ledger · Decision Stream</h2>{led_html}</div>
     """
-    stats = {"pending": total_pending, "agents": len(activity) or 6,
+    stats = {"pending": total_pending, "agents": len(merged) or 6,
              "briefs": len(briefs), "decisions": len(ledger)}
     return _page(body, stats)
+
+
+@app.get("/agent/{agent_id}", response_class=HTMLResponse)
+async def agent_dashboard(agent_id: str):
+    cid = _canon(agent_id)
+    icon, name, role, what = AGENT_META.get(cid, ("🤖", agent_id, "Agent", ""))
+    activity = await get_agent_activity()
+    # merge any raw-id variants into this canonical agent
+    acts = []
+    for aid, rows in activity.items():
+        if _canon(aid) == cid:
+            acts.extend(rows)
+    acts.sort(key=lambda a: a["ts"], reverse=True)
+
+    # breakdown by event label
+    kinds = {}
+    for a in acts:
+        kinds[_event_label(a["event"])] = kinds.get(_event_label(a["event"]), 0) + 1
+    tickets = sorted({t for a in acts for t in (_ticket_of(a.get("detail", "")),) if t})
+
+    kpi = "".join(
+        f'<div class=stat><div class=stat-v>{v}</div><div class=stat-l>{k}</div></div>'
+        for k, v in sorted(kinds.items(), key=lambda x: -x[1])[:4]) or \
+        '<div class=stat><div class=stat-v>0</div><div class=stat-l>Actions</div></div>'
+
+    rows = "".join(
+        f'<div class=row><span class=t>{_event_chip(a["event"])}{_clean_detail(a["detail"])}</span>'
+        f'<span class=ts>{a["ts"]}</span></div>'
+        for a in acts[:60]) or "<p class=empty>No recorded actions yet.</p>"
+
+    tkchips = " ".join(f'<span class=badge>{t}</span>' for t in tickets[:24]) or \
+        '<span class=muted>None</span>'
+
+    body = f"""
+    <a class=back href="/">← All agents</a>
+    <div class="card agent-hero">
+      <span class=hero-ico>{icon}</span>
+      <div>
+        <h1>{name}</h1>
+        <div class=hero-role>{role}</div>
+        <p class=hero-what>{what}</p>
+      </div>
+    </div>
+    <div class=stats4>{kpi}</div>
+    <div class=card><h2>Summary</h2>
+      <p style="font-size:16px;margin:0 0 8px">{_summarize(cid, acts)}</p>
+      <p class=muted>Tickets touched ({len(tickets)}):</p>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">{tkchips}</div>
+    </div>
+    <div class=card><h2>Activity Log</h2>{rows}</div>
+    """
+    stats = {"pending": "", "agents": "", "briefs": "", "decisions": len(acts)}
+    return _page(body, stats, show_stats=False)
+
+
+# Map raw event_type codes → human label + chip colour class
+_EVENT_LABELS = {
+    "ESCALATION_PENDING":  ("Awaiting approval", "warn"),
+    "ESCALATION_RESOLVED": ("Resolved",          "ok"),
+    "REPORTED_DECISION":   ("Reported",          "info"),
+    "SILENT_DECISION":     ("Logged",            "muted"),
+    "AUDIT_FINDING":       ("Finding",           "info"),
+    "gate":                ("Awaiting approval", "warn"),
+    "decision":            ("Reported",          "info"),
+    "escalation":          ("Escalation",        "warn"),
+    "resolved":            ("Resolved",          "ok"),
+    "draft-ping":          ("Drafted",           "info"),
+    "jira-comment":        ("Posted to Jira",    "ok"),
+}
+
+
+def _event_label(ev: str) -> str:
+    return _EVENT_LABELS.get(ev, (ev.replace("_", " ").title(), "muted"))[0]
+
+
+def _event_chip(ev: str) -> str:
+    label, cls = _EVENT_LABELS.get(ev, (ev.replace("_", " ").title(), "muted"))
+    return f'<span class="chip {cls}">{label}</span>'
+
+
+def _clean_detail(detail: str) -> str:
+    """Strip leading 'key:' machine prefixes and tidy whitespace for display."""
+    d = (detail or "").strip()
+    # drop a leading 'snake_case_label:' if present (e.g. 'escalation_triggered:')
+    if ":" in d:
+        head, rest = d.split(":", 1)
+        if "_" in head and " " not in head and len(head) < 40:
+            d = rest.strip()
+    return d[:200]
 
 
 def _evidence_str(e: dict) -> str:
@@ -470,6 +575,69 @@ def _evidence_str(e: dict) -> str:
     if isinstance(ev, dict):
         return (ev.get("detail") or json.dumps(ev))[:120]
     return e.get("detail", "")[:120]
+
+
+# ── Agent identity + summaries ────────────────────────────────────────────────
+
+# Canonical id, icon, name, one-line role, and the plain-English "what it does".
+AGENT_META = {
+    "pmo_orchestrator":           ("🧭", "Orchestrator", "Coordinates the swarm",
+        "Kicks off each sub-agent, enforces approval gates, and writes the daily Operating Brief."),
+    "execution_tracking_agent":   ("📋", "Execution Tracking", "Finds stalled work",
+        "Scans every Jira board and flags tickets that have gone quiet or are at risk of slipping."),
+    "follow_up_agent":            ("✉️", "Follow-up & Escalation", "Drafts the nudges",
+        "Writes warm, human chase and escalation messages for stalled tickets — queued for your approval."),
+    "ownership_raci_agent":       ("👥", "Ownership / RACI", "Knows who owns what",
+        "Resolves who is Accountable and Responsible on each ticket so messages reach the right person."),
+    "feature_completeness_agent": ("🧱", "Feature Completeness", "Tracks build progress",
+        "Audits the product catalog to track which features are built versus still outstanding."),
+    "hygiene_agent":              ("🧹", "Hygiene", "Keeps boards tidy",
+        "Detects missing fields, wrong issue types, and other data-quality problems on tickets."),
+    "human":                      ("🧑", "Human Reviewer", "You",
+        "Approvals and declines made through this dashboard."),
+}
+
+# Map every raw agent_id variant to a canonical id.
+_CANON = {
+    "pmo_orchestrator": "pmo_orchestrator",
+    "pmo_execution_tracking": "execution_tracking_agent",
+    "execution_tracking_agent": "execution_tracking_agent",
+    "pmo_follow_up": "follow_up_agent", "follow_up_agent": "follow_up_agent",
+    "pmo_ownership_raci": "ownership_raci_agent", "ownership_raci_agent": "ownership_raci_agent",
+    "pmo_feature_completeness": "feature_completeness_agent",
+    "feature_completeness_agent": "feature_completeness_agent",
+    "pmo_hygiene": "hygiene_agent", "hygiene_agent": "hygiene_agent",
+    "human": "human",
+}
+
+
+def _canon(agent_id: str) -> str:
+    return _CANON.get(agent_id, agent_id)
+
+
+def _summarize(agent_id: str, acts: list) -> str:
+    """Plain-English summary of what this agent has been doing."""
+    if not acts:
+        return "No activity recorded yet."
+    n = len(acts)
+    tickets = {t for a in acts for t in (_ticket_of(a.get("detail", "")),) if t}
+    cid = _canon(agent_id)
+    nt = len(tickets)
+    if cid == "follow_up_agent":
+        return f"Drafted {n} follow-up message{'s' if n!=1 else ''} across {nt} ticket{'s' if nt!=1 else ''}, queued for approval."
+    if cid == "hygiene_agent":
+        return f"Flagged {n} data-quality issue{'s' if n!=1 else ''} on {nt} ticket{'s' if nt!=1 else ''}."
+    if cid == "execution_tracking_agent":
+        return f"Reviewed the boards and surfaced {nt} stalled ticket{'s' if nt!=1 else ''}."
+    if cid == "ownership_raci_agent":
+        return f"Resolved ownership for {nt or n} ticket{'s' if (nt or n)!=1 else ''}."
+    if cid == "feature_completeness_agent":
+        return f"Ran {n} build-completeness audit{'s' if n!=1 else ''}."
+    if cid == "orchestrator" or cid == "pmo_orchestrator":
+        return f"Coordinated {n} decision{'s' if n!=1 else ''} this period across {nt} ticket{'s' if nt!=1 else ''}."
+    if cid == "human":
+        return f"You resolved {n} approval{'s' if n!=1 else ''}."
+    return f"{n} recorded action{'s' if n!=1 else ''}."
 
 
 async def _record_resolution(ticket: str, detail: str) -> None:
