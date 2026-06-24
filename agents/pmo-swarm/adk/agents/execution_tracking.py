@@ -16,6 +16,7 @@ from google.adk.tools import FunctionTool
 from google.adk.tools.agent_tool import AgentTool
 
 from ..shared import jira_client as jc
+from ..shared.governance import trust_ledger_log
 from .follow_up import follow_up_agent
 
 _PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "execution_tracking.md"
@@ -73,7 +74,16 @@ def find_stalled_issues(hours_threshold: int = 24, project: str = "") -> dict:
         project: Project key, or omit/'ALL' to scan all configured projects.
     """
     projects = None if (not project or project.upper() == "ALL") else [project]
-    return jc.find_stalled(hours_threshold, projects)
+    result = jc.find_stalled(hours_threshold, projects)
+    stalled = result.get("issues", []) if isinstance(result, dict) else []
+    for s in stalled[:50]:
+        key = s.get("key", "")
+        trust_ledger_log(
+            "audit",
+            f"Stalled {s.get('hours_stalled', '?')}h: {s.get('summary', '')[:80]} [{key}]",
+            agent_id="pmo_execution_tracking",
+        )
+    return result
 
 
 def get_changes_since(hours: int = 24, project: str = "") -> dict:

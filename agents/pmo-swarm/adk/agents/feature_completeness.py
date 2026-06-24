@@ -41,20 +41,24 @@ _STAGING_DIV_REMAP = {
 
 
 def _is_unbuilt(node: dict) -> bool:
-    href = node.get("href", "") or ""
-    return not href or "coming-soon" in href or href == ""
+    href   = (node.get("href", "") or "").lower()
+    status = (node.get("status", "") or "").lower()
+    # 'Coming Soon' status or a missing/placeholder href both mean unbuilt.
+    if status in ("coming soon", "coming-soon", "planned", "not built"):
+        return True
+    return not href or "coming-soon" in href
 
 
 def _walk_tree(nodes: list, path: str = "") -> list:
     """Recursively walk the navigation tree and return all function-level leaf nodes."""
     leaves = []
     for node in nodes:
-        label     = node.get("label", node.get("name", ""))
+        label     = node.get("title") or node.get("label") or node.get("name", "")
         node_path = f"{path} / {label}" if path else label
         children  = node.get("children", node.get("items", []))
         if children:
             leaves.extend(_walk_tree(children, node_path))
-        else:
+        elif node.get("type") == "function" or node.get("href") or node.get("status"):
             leaves.append({
                 "path":    node_path,
                 "label":   label,
@@ -98,14 +102,18 @@ def audit_features(division_filter: str = "") -> dict:
         return {"error": f"Firestore connection failed: {e}"}
 
     try:
-        doc = db.collection("system_config").document("navigation.schema").get()
+        # Document lives at system_config/navigation (overridable via env).
+        doc_id = os.environ.get("NAV_SCHEMA_DOC", "navigation")
+        doc = db.collection("system_config").document(doc_id).get()
         if not doc.exists:
-            return {"error": "system_config/navigation.schema not found in Firestore"}
+            return {"error": f"system_config/{doc_id} not found in Firestore"}
         raw = doc.to_dict() or {}
-        # Schema is stored as an array under 'data' key
-        nav_data = raw.get("data", raw.get("navigation", []))
+        # The nav tree is stored under 'children' (fall back to other known keys).
+        nav_data = (raw.get("children") or raw.get("data")
+                    or raw.get("navigation") or [])
         if not isinstance(nav_data, list):
-            nav_data = list(raw.values())[0] if raw else []
+            # last resort: first list-valued field
+            nav_data = next((v for v in raw.values() if isinstance(v, list)), [])
     except Exception as e:
         return {"error": f"Firestore read failed: {e}"}
 
@@ -140,6 +148,17 @@ def audit_features(division_filter: str = "") -> dict:
         total_features += len(leaves)
 
     pct = round(total_built / total_features * 100, 1) if total_features else 0
+
+    try:
+        from ..shared.governance import trust_ledger_log
+        trust_ledger_log(
+            "audit",
+            f"Build audit: {total_built}/{total_features} features built ({pct}%) "
+            f"across {len(by_division)} divisions",
+            agent_id="pmo_feature_completeness",
+        )
+    except Exception:
+        pass
 
     return {
         "total_features": total_features,

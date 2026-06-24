@@ -189,21 +189,35 @@ async def pending_gates(last_n: int = 300):
             "WHERE swarm_id='pmo-swarm' AND event_type IN "
             "('ESCALATION_PENDING','ESCALATION_RESOLVED') "
             "ORDER BY created_at ASC LIMIT $1", last_n)
-    resolved, opened, seen = set(), [], set()
+    resolved_tk, resolved_detail, opened, seen = set(), set(), [], set()
     for r in rows:
         detail = _ev_detail(r["evidence"])
         tk = _ticket_of(detail)
         if r["event_type"] == "ESCALATION_RESOLVED":
-            resolved.add(tk)
+            if tk:
+                resolved_tk.add(tk)
+            # also record the resolved detail body (lets us clear keyless gates)
+            resolved_detail.add(_strip_resolution_suffix(detail))
         else:
             opened.append((detail, tk, r["created_at"]))
     out = []
     for detail, tk, ts in reversed(opened):
-        if detail in seen or (tk and tk in resolved):
+        if detail in seen:
+            continue
+        if (tk and tk in resolved_tk) or _strip_resolution_suffix(detail) in resolved_detail:
             continue
         seen.add(detail)
         out.append({"detail": detail, "ticket": tk, "ts": str(ts)[:19]})
     return out
+
+
+def _strip_resolution_suffix(detail: str) -> str:
+    """A resolution row stores '<original detail> [TICKET]' or '<reason> [TICKET]'.
+    Normalize so a keyless gate's detail can match its resolution record."""
+    d = (detail or "").strip()
+    if "[" in d and d.endswith("]"):
+        d = d.rsplit("[", 1)[0].strip()
+    return d
 
 
 # ── HTML rendering ──────────────────────────────────────────────────────────
@@ -413,17 +427,16 @@ async def home(msg: str = "", kind: str = ""):
     for acts in merged.values():
         acts.sort(key=lambda a: a["ts"], reverse=True)
 
+    # Always show the full swarm: orchestrator + 5 sub-agents (+ human), even when
+    # an agent logged nothing this period (it then shows "No activity recorded yet").
     order = ["pmo_orchestrator", "execution_tracking_agent", "follow_up_agent",
              "ownership_raci_agent", "feature_completeness_agent", "hygiene_agent", "human"]
     seen_agents, agents_html = set(), ""
     for aid in order:
-        if aid in merged and aid not in seen_agents:
-            agents_html += _agent_card(aid, merged[aid]); seen_agents.add(aid)
-    for aid, acts in merged.items():
+        agents_html += _agent_card(aid, merged.get(aid, [])); seen_agents.add(aid)
+    for aid, acts in merged.items():   # any unexpected agent ids
         if aid not in seen_agents:
             agents_html += _agent_card(aid, acts); seen_agents.add(aid)
-    if not agents_html:
-        agents_html = "<p class=empty>No agent activity yet. Run a cycle to populate.</p>"
     agents_html = f'<div class=agent-grid>{agents_html}</div>'
 
     briefs_html = "".join(
@@ -451,10 +464,15 @@ async def home(msg: str = "", kind: str = ""):
     {banner}
     <div class=card>
       <h2>Pending Human Approvals <span class=count>· {total_pending}</span>
-        <form method=post action="/clear" style="margin-left:auto"
-          onsubmit="return confirm('Clear ALL pending approvals? They will not be posted to Jira.')">
-          <button class="btn sm" type=submit>Clear all</button>
-        </form>
+        <span style="margin-left:auto">
+          <button class="btn sm" type=button id=clr-1
+            onclick="document.getElementById('clr-1').style.display='none';document.getElementById('clr-2').style.display='inline-flex'">Clear all</button>
+          <form method=post action="/clear" id=clr-2 style="display:none;gap:8px">
+            <button class="btn sm" type=submit>Confirm clear</button>
+            <button class="btn sm" type=button
+              onclick="document.getElementById('clr-2').style.display='none';document.getElementById('clr-1').style.display='inline-flex'">Cancel</button>
+          </form>
+        </span>
       </h2>{pend}
     </div>
     <div class=card>
@@ -604,6 +622,7 @@ _CANON = {
     "execution_tracking_agent": "execution_tracking_agent",
     "pmo_follow_up": "follow_up_agent", "follow_up_agent": "follow_up_agent",
     "pmo_ownership_raci": "ownership_raci_agent", "ownership_raci_agent": "ownership_raci_agent",
+    "pmo_raci": "ownership_raci_agent",
     "pmo_feature_completeness": "feature_completeness_agent",
     "feature_completeness_agent": "feature_completeness_agent",
     "pmo_hygiene": "hygiene_agent", "hygiene_agent": "hygiene_agent",
@@ -653,6 +672,27 @@ async def _record_resolution(ticket: str, detail: str) -> None:
             get_tenant_id(), "pmo-swarm", "human",
             "ESCALATION_RESOLVED", "HUMAN_GATE",
             json.dumps({"detail": f"{detail} [{ticket}]"}))
+
+
+async def _record_gate_resolution(ticket: str, detail: str) -> None:
+    """Resolve a specific open gate by storing its EXACT detail body, so it matches
+    in pending_gates() even when there is no ticket key. Works for keyless gates."""
+    pool = await _db_pool()
+    if pool is None:
+        return
+    from adk.shared.config_registry import get_tenant_id
+    # Store the gate's STRIPPED detail (no trailing [..]) plus a fresh [ticket] suffix.
+    # pending_gates() compares _strip_resolution_suffix(open) against the stored
+    # stripped body, so both sides normalize to the same string and the gate clears.
+    stripped = _strip_resolution_suffix(detail)
+    body = f"{stripped} [{ticket}]"
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "INSERT INTO trust_ledger (tenant_id, swarm_id, role_category, "
+            "event_type, decision_class, evidence) VALUES ($1,$2,$3,$4,$5,$6)",
+            get_tenant_id(), "pmo-swarm", "human",
+            "ESCALATION_RESOLVED", "HUMAN_GATE",
+            json.dumps({"detail": body}))
 
 
 def _flash(msg: str, kind: str = "ok") -> RedirectResponse:
@@ -748,11 +788,11 @@ async def clear_all():
                 n += int(res.split()[-1]) if res and res.split()[-1].isdigit() else 0
         except Exception:
             pass
-    # 2. legacy ledger gates — write a resolution for each open ticket
+    # 2. legacy ledger gates — write a resolution for every open gate, including
+    #    keyless ones (resolve by the gate's own detail body so it stops matching).
     for g in await pending_gates():
-        if g["ticket"]:
-            await _record_resolution(g["ticket"], "cleared via UI")
-            n += 1
+        await _record_gate_resolution(g["ticket"], g["detail"])
+        n += 1
     trust_ledger_log("resolved", f"Cleared {n} pending approvals via UI", agent_id="human")
     log.info("Cleared %d pending approvals via UI", n)
     return _flash(f"🗑 Cleared {n} pending approvals. None were posted to Jira.", "warn")
