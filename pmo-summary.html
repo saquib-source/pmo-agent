@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PMO-Swarm: Multi-Agent Orchestrator</title>
+  <style>
+    @font-face {
+      font-family: 'JetBrains Mono';
+      src: url('data:font/woff2;base64,d09GMgABAAAAACHoAAoAAAAAJRwAAAFS//+Nh8VHRgAAAgEAAAAA//) format('woff2');
+      font-weight: 400;
+      font-display: swap;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      background: #fafaf8;
+      color: #2a2a28;
+      line-height: 1.6;
+      letter-spacing: 0.3px;
+    }
+
+    /* Type scale */
+    h1 { font-size: 2.8rem; font-weight: 700; line-height: 1.1; letter-spacing: -0.02em; }
+    h2 { font-size: 2rem; font-weight: 600; line-height: 1.2; letter-spacing: -0.01em; margin-top: 3rem; }
+    h3 { font-size: 1.3rem; font-weight: 600; line-height: 1.3; letter-spacing: 0; }
+    .label { font-size: 0.8rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #6b5f5f; }
+    .meta { font-size: 0.95rem; color: #8b8985; line-height: 1.5; }
+    p { max-width: 70ch; line-height: 1.7; margin: 1rem 0; }
+
+    /* Color palette */
+    :root {
+      --bg-primary: #fafaf8;
+      --bg-secondary: #f0eeea;
+      --text-primary: #2a2a28;
+      --text-secondary: #6b5f5f;
+      --border: #e0dcd8;
+      --accent-warm: #b85c3c;
+      --accent-cool: #3d6b8f;
+      --success: #6b8657;
+      --warning: #a87e3a;
+      --error: #a05557;
+    }
+
+    /* Layout */
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 2rem;
+    }
+
+    .section {
+      padding: 4rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .section:last-child {
+      border-bottom: none;
+    }
+
+    .section.hero {
+      padding: 5rem 0;
+      background: linear-gradient(135deg, #f5f3f0 0%, #fafaf8 100%);
+      border-bottom: 2px solid var(--border);
+    }
+
+    /* Hero */
+    .hero-content {
+      max-width: 900px;
+    }
+
+    .hero-content h1 {
+      color: var(--accent-warm);
+      margin-bottom: 1rem;
+      text-wrap: balance;
+    }
+
+    .hero-content .meta {
+      font-size: 1.1rem;
+      color: var(--text-secondary);
+      margin-bottom: 2rem;
+    }
+
+    /* Grid layouts */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3rem;
+      align-items: start;
+      margin: 2rem 0;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 2rem;
+      margin: 2rem 0;
+    }
+
+    .grid-5 {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 1.5rem;
+      margin: 2rem 0;
+    }
+
+    @media (max-width: 900px) {
+      .grid-2 { grid-template-columns: 1fr; }
+      .grid-3 { grid-template-columns: repeat(2, 1fr); }
+      .grid-5 { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 600px) {
+      .grid-3, .grid-5 { grid-template-columns: 1fr; }
+      h1 { font-size: 2rem; }
+      h2 { font-size: 1.5rem; }
+      .section { padding: 2rem 0; }
+    }
+
+    /* Cards */
+    .card {
+      background: white;
+      border: 1px solid var(--border);
+      padding: 2rem;
+      border-radius: 8px;
+      transition: all 0.2s ease;
+    }
+
+    .card:hover {
+      border-color: var(--accent-warm);
+      box-shadow: 0 4px 12px rgba(184, 92, 60, 0.1);
+    }
+
+    .card h3 {
+      color: var(--accent-warm);
+      margin-bottom: 1rem;
+    }
+
+    .card.alt {
+      background: var(--bg-secondary);
+      border-color: transparent;
+    }
+
+    .card.success {
+      border-left: 4px solid var(--success);
+    }
+
+    .card.warning {
+      border-left: 4px solid var(--warning);
+    }
+
+    .card.error {
+      border-left: 4px solid var(--error);
+    }
+
+    /* Agents diagram */
+    .agent-box {
+      background: white;
+      border: 2px solid var(--accent-cool);
+      padding: 1.5rem;
+      border-radius: 6px;
+      text-align: center;
+      position: relative;
+    }
+
+    .agent-box .emoji {
+      font-size: 2rem;
+      display: block;
+      margin-bottom: 0.5rem;
+    }
+
+    .agent-box h4 {
+      color: var(--accent-cool);
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+
+    .agent-box .role {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      line-height: 1.4;
+    }
+
+    /* Authority badges */
+    .authority {
+      display: inline-block;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      padding: 0.25rem 0.75rem;
+      border-radius: 3px;
+      margin-top: 0.5rem;
+      text-transform: uppercase;
+    }
+
+    .authority.read-only {
+      background: #e8f0f8;
+      color: var(--accent-cool);
+    }
+
+    .authority.escalate {
+      background: #fce8e3;
+      color: var(--accent-warm);
+    }
+
+    /* Diagram styles */
+    .flow-diagram {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 2rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.9rem;
+      overflow-x: auto;
+      line-height: 1.8;
+      color: #555;
+    }
+
+    .flow-diagram code {
+      color: var(--accent-warm);
+      font-weight: 600;
+    }
+
+    /* Data flow */
+    .data-flow {
+      display: flex;
+      gap: 1.5rem;
+      margin: 2rem 0;
+      align-items: stretch;
+      flex-wrap: wrap;
+    }
+
+    .data-store {
+      flex: 1;
+      min-width: 200px;
+      background: white;
+      border: 1px solid var(--border);
+      padding: 1.5rem;
+      border-radius: 6px;
+      border-top: 3px solid var(--accent-cool);
+    }
+
+    .data-store h4 {
+      font-size: 0.9rem;
+      color: var(--accent-cool);
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .data-store ul {
+      list-style: none;
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+    }
+
+    .data-store li {
+      margin: 0.5rem 0;
+      padding-left: 1.25rem;
+      position: relative;
+    }
+
+    .data-store li:before {
+      content: "→";
+      position: absolute;
+      left: 0;
+      color: var(--accent-cool);
+    }
+
+    /* Checklist */
+    .checklist {
+      list-style: none;
+      margin: 2rem 0;
+    }
+
+    .checklist li {
+      padding: 0.75rem 0;
+      padding-left: 2rem;
+      position: relative;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .checklist li:before {
+      content: "☐";
+      position: absolute;
+      left: 0;
+      color: var(--accent-cool);
+      font-weight: bold;
+      font-size: 1.2rem;
+    }
+
+    .checklist li.done:before {
+      content: "☑";
+      color: var(--success);
+    }
+
+    .checklist li:last-child {
+      border-bottom: none;
+    }
+
+    /* Code blocks */
+    .code-block {
+      background: #2a2a28;
+      color: #f0eeea;
+      padding: 1.5rem;
+      border-radius: 6px;
+      overflow-x: auto;
+      margin: 1.5rem 0;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      line-height: 1.6;
+    }
+
+    .code-block code {
+      font-family: inherit;
+    }
+
+    /* Command highlight */
+    .cmd {
+      background: var(--bg-secondary);
+      padding: 0.25rem 0.5rem;
+      border-radius: 3px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.9rem;
+      color: var(--accent-warm);
+      white-space: nowrap;
+    }
+
+    /* Stats */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 2rem;
+      margin: 2rem 0;
+    }
+
+    .stat {
+      text-align: center;
+    }
+
+    .stat-number {
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: var(--accent-warm);
+      line-height: 1;
+    }
+
+    .stat-label {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      margin-top: 0.5rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* Timeline */
+    .timeline {
+      position: relative;
+      padding-left: 2rem;
+      margin: 2rem 0;
+    }
+
+    .timeline:before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: linear-gradient(to bottom, var(--accent-cool), transparent);
+    }
+
+    .timeline-item {
+      margin-bottom: 2rem;
+      padding: 1rem;
+      border-left: 4px solid var(--border);
+      padding-left: 1.5rem;
+    }
+
+    .timeline-item.active {
+      border-left-color: var(--accent-warm);
+      background: linear-gradient(to right, rgba(184, 92, 60, 0.05), transparent);
+    }
+
+    .timeline-item h4 {
+      color: var(--accent-warm);
+      margin-bottom: 0.5rem;
+    }
+
+    /* CTA */
+    .cta-group {
+      display: flex;
+      gap: 1rem;
+      margin: 2rem 0;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.5rem;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: none;
+    }
+
+    .btn-primary {
+      background: var(--accent-warm);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #9d4c2f;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(184, 92, 60, 0.3);
+    }
+
+    .btn-secondary {
+      background: var(--bg-secondary);
+      color: var(--accent-warm);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--accent-warm);
+      background: white;
+    }
+
+    /* Footer */
+    .footer {
+      background: var(--bg-secondary);
+      padding: 3rem 0;
+      text-align: center;
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      margin-top: 4rem;
+    }
+
+    .footer p {
+      max-width: none;
+      margin: 0.5rem 0;
+    }
+
+    /* Focus states */
+    a:focus-visible {
+      outline: 2px solid var(--accent-warm);
+      outline-offset: 4px;
+      border-radius: 2px;
+    }
+
+    button:focus-visible {
+      outline: 2px solid var(--accent-warm);
+      outline-offset: 4px;
+    }
+
+    /* Reduced motion */
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        animation: none !important;
+        transition: none !important;
+      }
+    }
+
+    /* Utility */
+    .text-muted {
+      color: var(--text-secondary);
+    }
+
+    .mt-lg { margin-top: 3rem; }
+    .mb-lg { margin-bottom: 3rem; }
+
+  </style>
+</head>
+<body>
+
+<!-- HERO SECTION -->
+<section class="section hero">
+  <div class="container">
+    <div class="hero-content">
+      <h1>PMO-Swarm</h1>
+      <p class="meta">Multi-agent orchestrator for autonomous project management office operations. Scans Jira, audits RACI, enforces governance, generates daily operating briefs.</p>
+      <p>Built on ISRDS agentic platform. Production-ready. Runs on Google Cloud Run with Vertex AI Agent Engine.</p>
+      <div class="cta-group">
+        <a href="#deployment" class="btn btn-primary">→ Deploy Now</a>
+        <a href="#architecture" class="btn btn-secondary">View Architecture</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WHAT IS PMO-SWARM -->
+<section class="section">
+  <div class="container">
+    <h2>What PMO-Swarm Does</h2>
+    <p>PMO-Swarm runs on a schedule (every 60 minutes by default). Each cycle:</p>
+
+    <div class="grid-5">
+      <div class="card">
+        <h3>1. Scan</h3>
+        <p class="meta">Execution Tracking Agent queries Jira for stalled tickets (>24h no activity)</p>
+      </div>
+      <div class="card">
+        <h3>2. Audit</h3>
+        <p class="meta">Ownership/RACI Agent checks for missing owners or role gaps</p>
+      </div>
+      <div class="card">
+        <h3>3. Verify</h3>
+        <p class="meta">Hygiene Agent scans for field violations, stale status</p>
+      </div>
+      <div class="card">
+        <h3>4. Draft</h3>
+        <p class="meta">Follow-Up Agent drafts escalation messages for review</p>
+      </div>
+      <div class="card">
+        <h3>5. Report</h3>
+        <p class="meta">Orchestrator synthesizes findings into Operating Brief</p>
+      </div>
+    </div>
+
+    <h3 style="margin-top: 3rem;">Output</h3>
+    <p>Each cycle produces a <strong>daily Operating Brief</strong>:</p>
+    <div class="code-block">
+📊 PMO OPERATING BRIEF — 2026-06-24
+
+✅ Execution Health
+   • 3 stalled tickets (>48h)
+   • ISRDS-1151: critical path, 169h no activity
+   • ASHS-42: blocked on external vendor
+
+⚠️  Governance & Escalations
+   • Review gate: Follow-up message for ISRDS-1151 (pending approval)
+   • RACI gap: 2 unassigned features in ROADMAP project
+
+📈 Feature Progress
+   • Mobile auth: 75% built (blocked on backend API)
+   • Payment integration: awaiting schema finalization
+
+📋 Team Notes
+   • 5 tickets with missing Description field
+   • 8 tickets stale in "In Progress" status >1 week
+    </div>
+  </div>
+</section>
+
+<!-- ARCHITECTURE -->
+<section class="section" id="architecture">
+  <div class="container">
+    <h2>Architecture: 1 Orchestrator + 5 Skill Agents</h2>
+    <p>PMO-Swarm uses the Google ADK (Agent Development Kit) to fan out work to 5 specialized agents. The root orchestrator routes requests, enforces governance gates, and synthesizes findings.</p>
+
+    <h3 style="margin-top: 2rem;">The 5 Skill Agents</h3>
+    <div class="grid-5">
+      <div class="agent-box">
+        <span class="emoji">📊</span>
+        <h4>Execution Tracking</h4>
+        <p class="role">Scans Jira for stalled tickets</p>
+        <span class="authority read-only">Decide & Report</span>
+      </div>
+      <div class="agent-box">
+        <span class="emoji">💬</span>
+        <h4>Follow-Up</h4>
+        <p class="role">Drafts escalation messages</p>
+        <span class="authority escalate">Must Escalate</span>
+      </div>
+      <div class="agent-box">
+        <span class="emoji">👥</span>
+        <h4>Ownership RACI</h4>
+        <p class="role">Audits owner gaps</p>
+        <span class="authority escalate">Must Escalate</span>
+      </div>
+      <div class="agent-box">
+        <span class="emoji">✨</span>
+        <h4>Feature Progress</h4>
+        <p class="role">Tracks build completion</p>
+        <span class="authority read-only">Decide & Report</span>
+      </div>
+      <div class="agent-box">
+        <span class="emoji">🧹</span>
+        <h4>Hygiene</h4>
+        <p class="role">Detects field violations</p>
+        <span class="authority read-only">Decide & Report</span>
+      </div>
+    </div>
+
+    <h3 style="margin-top: 3rem;">Authority Levels</h3>
+    <div class="grid-2">
+      <div class="card">
+        <h4 style="color: var(--accent-cool);">DECIDE & REPORT</h4>
+        <p>Read-only agents. No approval gate needed. Log findings to Trust Ledger and Cloud Logging.</p>
+        <p class="meta">Execution Tracking, Feature Progress, Hygiene</p>
+      </div>
+      <div class="card">
+        <h4 style="color: var(--accent-warm);">MUST ESCALATE</h4>
+        <p>Write agents. Open a governance gate before any Jira action. Await human review/approval.</p>
+        <p class="meta">Follow-Up (Review gate), Ownership RACI (Approve gate)</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 8-LAYER MODEL -->
+<section class="section">
+  <div class="container">
+    <h2>8-Layer Technical Model</h2>
+    <p>PMO-Swarm's architecture is built in 8 distinct layers, each with a clear responsibility:</p>
+
+    <table style="width: 100%; margin: 2rem 0; border-collapse: collapse;">
+      <tr style="border-bottom: 2px solid var(--border);">
+        <th style="text-align: left; padding: 1rem; font-weight: 600; color: var(--accent-warm);">Layer</th>
+        <th style="text-align: left; padding: 1rem; font-weight: 600; color: var(--accent-warm);">Name</th>
+        <th style="text-align: left; padding: 1rem; font-weight: 600; color: var(--accent-warm);">Purpose</th>
+      </tr>
+      <tr style="border-bottom: 1px solid var(--border);">
+        <td style="padding: 1rem; font-family: 'JetBrains Mono', monospace; color: var(--accent-warm);">1</td>
+        <td style="padding: 1rem; font-weight: 600;">Config Registry</td>
+        <td style="padding: 1rem;">Runtime config: model, Jira projects, scan interval</td>
+      </tr>
+      <tr style="border-bottom: 1px solid var(--border);">
+        <td style="padding: 1rem; font-family: 'JetBrains Mono', monospace; color: var(--accent-warm);">2</td>
+        <td style="padding: 1rem; font-weight: 600;">Agent Runtime</td>
+        <td style="padding: 1rem;">Google ADK orchestrator, Runner, session management</td>
+      </tr>
+      <tr style="border-bottom: 1px solid var(--border);">
+        <td style="padding: 1rem; font-family: 'JetBrains Mono', monospace; color: var(--accent-warm);">3</td>
+        <td style="padding: 1rem; font-weight: 600;">Tools</td>
+        <td style="padding: 1rem;">22 tools: Jira, Firestore, AlloyDB, governance gates</td>
+      </tr>
+      <tr style="border-bottom: 1px solid var(--border);">
+        <td style="padding: 1rem; font-family: 'JetBrains Mono', monospace; color: var(--accent-warm);">4</td>
+        <td style="padding: 1rem; font-weight: 600;">Memory/Sessions</td>
+        <td style="padding: 1rem;">ADK VertexAiSessionService for agent state</td>
+      </tr>
+      <tr style="border-bottom: 1px solid var(--border);">
+        <td style="padding: 1rem; font-family: 'JetBrains Mono', monospace; color: var(--accent-warm);">5</td>
+        <td style="padding: 1rem; font-weight: 600;">Governance</td>
+        <td style="padding: 1rem;">Approval gates + Trust Ledger (audit trail)</td>
+      </tr>
+      <tr style="border-bottom: 1px solid var(--border);">
+        <td style="padding: 1rem; font-family: 'JetBrains Mono', monospace; color: var(--accent-warm);">6</td>
+        <td style="padding: 1rem; font-weight: 600;">Human Override</td>
+        <td style="padding: 1rem;">Review/Approve/Escalate gates before Jira writes</td>
+      </tr>
+      <tr style="border-bottom: 1px solid var(--border);">
+        <td style="padding: 1rem; font-family: 'JetBrains Mono', monospace; color: var(--accent-warm);">7</td>
+        <td style="padding: 1rem; font-weight: 600;">Workflow</td>
+        <td style="padding: 1rem;">Scheduled daemon loop, Cloud Run job trigger</td>
+      </tr>
+      <tr>
+        <td style="padding: 1rem; font-family: 'JetBrains Mono', monospace; color: var(--accent-warm);">8</td>
+        <td style="padding: 1rem; font-weight: 600;">Observability</td>
+        <td style="padding: 1rem;">Cloud Logging, Monitoring, traces, metrics</td>
+      </tr>
+    </table>
+  </div>
+</section>
+
+<!-- DATA PERSISTENCE -->
+<section class="section">
+  <div class="container">
+    <h2>Data Persistence: 4 Destinations</h2>
+    <p>Each cycle writes to four storage layers for redundancy, analytics, and audit trails:</p>
+
+    <div class="data-flow">
+      <div class="data-store">
+        <h4>📄 Local Files</h4>
+        <ul>
+          <li>trust-ledger.jsonl</li>
+          <li>briefs/brief_*.txt</li>
+          <li>Append-only backup</li>
+        </ul>
+      </div>
+      <div class="data-store">
+        <h4>☁️ Cloud Logging</h4>
+        <ul>
+          <li>Real-time searchable</li>
+          <li>Governance gates</li>
+          <li>Trace IDs for correlation</li>
+        </ul>
+      </div>
+      <div class="data-store">
+        <h4>📊 BigQuery</h4>
+        <ul>
+          <li>operating_briefs table</li>
+          <li>cycle_metrics table</li>
+          <li>System of record</li>
+        </ul>
+      </div>
+      <div class="data-store">
+        <h4>🗄️ AlloyDB</h4>
+        <ul>
+          <li>daily_briefings backup</li>
+          <li>Fast operational reads</li>
+          <li>30-day retention</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- DEPLOYMENT -->
+<section class="section" id="deployment">
+  <div class="container">
+    <h2>Production Deployment</h2>
+    <p>PMO-Swarm runs as a containerized job on Google Cloud Run. Here's the deployment checklist:</p>
+
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-number">3</div>
+        <div class="stat-label">GCP APIs Required</div>
+      </div>
+      <div class="stat">
+        <div class="stat-number">5</div>
+        <div class="stat-label">Environment Variables</div>
+      </div>
+      <div class="stat">
+        <div class="stat-number">~15</div>
+        <div class="stat-label">Minutes to Deploy</div>
+      </div>
+      <div class="stat">
+        <div class="stat-number">1</div>
+        <div class="stat-label">Container Image</div>
+      </div>
+    </div>
+
+    <h3 style="margin-top: 3rem;">Quick Deploy Steps</h3>
+
+    <div class="timeline">
+      <div class="timeline-item active">
+        <h4>Step 1: Build Docker Image</h4>
+        <p class="meta">Package the agent code + dependencies</p>
+        <div class="code-block">
+cd agents/pmo-swarm
+docker build -t pmo-agent:latest .
+        </div>
+      </div>
+
+      <div class="timeline-item">
+        <h4>Step 2: Push to Artifact Registry</h4>
+        <p class="meta">Store image in GCP for Cloud Run</p>
+        <div class="code-block">
+docker tag pmo-agent:latest \
+  us-central1-docker.pkg.dev/isr-division-systems-488723/docker-repo/pmo-agent:latest
+docker push us-central1-docker.pkg.dev/isr-division-systems-488723/docker-repo/pmo-agent:latest
+        </div>
+      </div>
+
+      <div class="timeline-item">
+        <h4>Step 3: Create Cloud Run Job</h4>
+        <p class="meta">Deploy the job definition (one-time setup)</p>
+        <div class="code-block">
+gcloud run jobs create pmo-swarm \
+  --image=us-central1-docker.pkg.dev/isr-division-systems-488723/docker-repo/pmo-agent:latest \
+  --region=us-central1 \
+  --project=isr-division-systems-488723 \
+  --timeout=3600
+        </div>
+      </div>
+
+      <div class="timeline-item">
+        <h4>Step 4: Execute & Monitor</h4>
+        <p class="meta">Run the job and watch logs</p>
+        <div class="code-block">
+gcloud run jobs execute pmo-swarm --region=us-central1 --project=isr-division-systems-488723
+
+# Stream logs
+gcloud logging read "resource.type=cloud_run_job AND resource.labels.job_name=pmo-swarm" \
+  --project=isr-division-systems-488723 --stream
+        </div>
+      </div>
+
+      <div class="timeline-item">
+        <h4>Step 5: Set Up Scheduler (Optional)</h4>
+        <p class="meta">Automate job execution on a cron schedule</p>
+        <div class="code-block">
+gcloud scheduler jobs create app-engine pmo-scheduler \
+  --schedule="*/60 * * * *" \
+  --http-method=POST \
+  --uri="https://us-central1-run.googleapis.com/apis/run.googleapis.com/v1/projects/isr-division-systems-488723/locations/us-central1/jobs/pmo-swarm:run" \
+  --oidc-service-account-email=pmo-agent-svc@isr-division-systems-488723.iam.gserviceaccount.com \
+  --oidc-token-audience="https://us-central1-run.googleapis.com"
+        </div>
+      </div>
+    </div>
+
+    <h3 style="margin-top: 3rem;">Health Check: What to Expect</h3>
+    <ul class="checklist">
+      <li class="done">Cloud Run job starts and shows "startup complete" log</li>
+      <li class="done">5 agents listed: execution_tracking, follow_up, ownership_raci, feature_completeness, hygiene</li>
+      <li class="done">Orchestrator processes prompt and returns Operating Brief</li>
+      <li class="done">Brief saved to briefs/brief_*.txt and Cloud Logging</li>
+      <li class="done">BigQuery receives cycle_metrics and operating_briefs</li>
+      <li class="done">AlloyDB daily_briefings table updated</li>
+      <li class="done">Container exits with exit code 0</li>
+    </ul>
+  </div>
+</section>
+
+<!-- LOGGING & MONITORING -->
+<section class="section">
+  <div class="container">
+    <h2>Logging & Monitoring</h2>
+    <p>Each cycle emits structured logs with emoji indicators for easy scanning. Here's what the logs look like:</p>
+
+    <div class="code-block">
+================================================================================
+🚀 PMO SWARM CYCLE START — 2026-06-24 20:24:22 UTC
+================================================================================
+📋 Mode: full
+🏗️  Projects: ISRDS, ASHS
+📊 Config: scan_interval=60min | brief_hour=8:00 | auto_comment=true
+🔄 Session ID: daemon-20260624202422
+────────────────────────────────────────────────────────────────────────────
+📌 Active Agents:
+   1️⃣  execution_tracking_agent (DECIDE_AND_REPORT)
+   2️⃣  follow_up_agent (MUST_ESCALATE)
+   3️⃣  ownership_raci_agent (MUST_ESCALATE)
+   4️⃣  feature_completeness_agent (DECIDE_AND_REPORT)
+   5️⃣  hygiene_agent (DECIDE_AND_REPORT)
+────────────────────────────────────────────────────────────────────────────
+🎯 Prompt (full): It is Wednesday, June 24, 2026 at 08:24 PM...
+────────────────────────────────────────────────────────────────────────────
+
+[agents execute in parallel...]
+
+────────────────────────────────────────────────────────────────────────────
+📝 ORCHESTRATOR RESPONSE:
+📊 PMO OPERATING BRIEF — 2026-06-24
+✅ Execution Health: 3 stalled tickets...
+────────────────────────────────────────────────────────────────────────────
+✅ Brief saved → briefs/brief_20260624_202422.txt
+⏱️  Execution time: 45.23 seconds
+📊 Operating Brief logged to BigQuery
+📈 Cycle metrics logged to BigQuery
+================================================================================
+✨ PMO SWARM CYCLE COMPLETE — 45.23s total
+================================================================================
+    </div>
+
+    <h3 style="margin-top: 3rem;">Common Queries</h3>
+
+    <div class="grid-2">
+      <div class="card">
+        <h4>View Recent Logs</h4>
+        <p class="meta">Stream latest 50 logs in real-time</p>
+        <div class="code-block" style="font-size: 0.8rem; padding: 1rem;">
+gcloud logging read \
+  "resource.type=cloud_run_job \
+  AND resource.labels.job_name=pmo-swarm" \
+  --stream
+        </div>
+      </div>
+
+      <div class="card">
+        <h4>Query BigQuery</h4>
+        <p class="meta">Get latest Operating Briefs</p>
+        <div class="code-block" style="font-size: 0.8rem; padding: 1rem;">
+SELECT cycle_ts, mode, duration_ms
+FROM isrds_pmo.operating_briefs
+ORDER BY cycle_ts DESC
+LIMIT 10;
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- NEXT STEPS -->
+<section class="section">
+  <div class="container">
+    <h2>Production Hardening: Next Steps</h2>
+    <p>PMO-Swarm is ready for production. To take it further:</p>
+
+    <div class="grid-3">
+      <div class="card">
+        <h3>1. Human Gates</h3>
+        <p>Wire approval gates to Slack or PagerDuty. Implement gate_handler that waits for human approval before posting to Jira.</p>
+      </div>
+
+      <div class="card">
+        <h3>2. Alerts</h3>
+        <p>Set up Cloud Monitoring alerts on governance escalations, stall counts, and feature gaps. Page on-call lead when critical.</p>
+      </div>
+
+      <div class="card">
+        <h3>3. Scale Agents</h3>
+        <p>Add more skill agents: budget tracking, risk assessment, capacity planning, dependency analysis.</p>
+      </div>
+
+      <div class="card">
+        <h3>4. Retention Policy</h3>
+        <p>Archive briefs to Cloud Storage after 30 days. Implement auto-cleanup of old AlloyDB and BigQuery records.</p>
+      </div>
+
+      <div class="card">
+        <h3>5. CI/CD Pipeline</h3>
+        <p>Wire GitHub Actions → Artifact Registry → Cloud Run. Push-button deploy with approval gates.</p>
+      </div>
+
+      <div class="card">
+        <h3>6. Dashboard</h3>
+        <p>Build a custom dashboard in Looker or Cloud Console. Surface briefs, stall trends, governance gate backlog.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FILES REFERENCE -->
+<section class="section">
+  <div class="container">
+    <h2>Documentation & Files</h2>
+    <p>Everything you need is in the repository:</p>
+
+    <div class="grid-2">
+      <div class="card">
+        <h4>📘 DEPLOY.md</h4>
+        <p>Step-by-step deployment guide. Prerequisites, local testing, Cloud Run setup, monitoring, troubleshooting.</p>
+      </div>
+
+      <div class="card">
+        <h4>🏗️ ARCHITECTURE.md</h4>
+        <p>Complete architecture documentation. 8-layer model, data flow, governance gates, storage destinations, queries.</p>
+      </div>
+
+      <div class="card">
+        <h4>📄 agent_spec.yaml</h4>
+        <p>Agent specification. Defines sub-agents, authority levels, runtime layers, tools, artifacts.</p>
+      </div>
+
+      <div class="card">
+        <h4>🔧 pmo_daemon.py</h4>
+        <p>Main daemon script. Orchestrates startup, cycle execution, brief generation, persistence.</p>
+      </div>
+
+      <div class="card">
+        <h4>⚙️ orchestrator.py</h4>
+        <p>Root agent implementation. Routes to skill agents, manages governance gates, synthesizes briefs.</p>
+      </div>
+
+      <div class="card">
+        <h4>🐳 Dockerfile</h4>
+        <p>Container definition. Python 3.12, all dependencies, environment setup for Cloud Run.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="section" style="background: var(--bg-secondary);">
+  <div class="container">
+    <h2 style="text-align: center;">Ready to Deploy?</h2>
+    <p style="text-align: center; max-width: none;">Start with the deployment guide, follow the 5-step process, and monitor logs in Cloud Logging. The first cycle takes ~45 seconds.</p>
+    <div class="cta-group" style="justify-content: center; margin-top: 2rem;">
+      <a href="https://github.com/saquib-source/pmo-agent" class="btn btn-primary">View on GitHub</a>
+      <a href="#deployment" class="btn btn-secondary">Back to Deploy Steps</a>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="container">
+    <p><strong>PMO-Swarm</strong> · ISRDS Agentic Platform</p>
+    <p>Architecture v2.2 · Updated June 24, 2026</p>
+    <p>Built with Google ADK, Vertex AI Agent Engine, Cloud Run</p>
+  </div>
+</footer>
+
+</body>
+</html>
