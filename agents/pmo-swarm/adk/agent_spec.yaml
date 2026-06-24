@@ -1,0 +1,117 @@
+version: "1.0"
+artifact_type: agent_spec
+swarm: pmo-swarm
+tenant: ashs
+generated_by: isrds-platform
+
+# ── Agent identity ─────────────────────────────────────────────────────────────
+name: pmo_orchestrator
+display_name: "PMO Orchestrator"
+description: >
+  Root agent of the PMO swarm.  Routes incoming requests to five skill agents,
+  enforces governance gates before any Jira write, and synthesises findings into
+  Operating Briefs delivered on a configurable schedule.
+
+model: gemini-2.5-flash        # overridable via Config Registry: system_config/pmo_agent_config
+runtime: google-adk
+
+# ── Sub-agents (skill mesh) ───────────────────────────────────────────────────
+sub_agents:
+  - name: execution_tracking_agent
+    role: "Scan Jira for stalled / at-risk tickets across all projects"
+    authority: DECIDE_AND_REPORT
+
+  - name: follow_up_agent
+    role: "Draft and surface chase pings for stalled tickets"
+    authority: MUST_ESCALATE          # cannot post to Jira without Review gate
+
+  - name: ownership_raci_agent
+    role: "Audit RACI gaps; surface missing accountable or responsible owners"
+    authority: MUST_ESCALATE          # cannot assign tickets without Approve gate
+
+  - name: feature_completeness_agent
+    role: "Audit Firestore nav catalog: built vs unbuilt features"
+    authority: DECIDE_AND_REPORT
+
+  - name: hygiene_agent
+    role: "Scan Jira tickets for hygiene violations (missing fields, stale status, etc.)"
+    authority: DECIDE_AND_REPORT
+
+# ── Authority gradient ────────────────────────────────────────────────────────
+authority_gradient:
+  MUST_ESCALATE:
+    description: "Agent surfaces finding but cannot act. Opens a governance gate."
+    applies_to:
+      - post_comment
+      - request_transition
+      - escalate
+      - assign_ticket
+
+  DECIDE_AND_REPORT:
+    description: "Agent decides and logs to Trust Ledger; no gate required."
+    applies_to:
+      - read-only Jira queries
+      - run_jql
+      - get_issue
+      - search_active
+      - audit_raci_gaps
+      - scan_hygiene
+      - audit_features
+
+  DECIDE_SILENTLY:
+    description: "Reserved for low-stakes read ops with no side-effects."
+    applies_to: []    # none in current spec — everything is reported
+
+# ── Runtime layers used ───────────────────────────────────────────────────────
+runtime_layers:
+  1_config_registry:
+    status: active
+    implementation: shared/config_registry.py
+    source: Firestore system_config/pmo_agent_config → env fallback
+
+  2_agent_runtime:
+    status: active
+    implementation: google-adk LlmAgent + Runner
+
+  3_tools:
+    status: active
+    implementation: shared/tool_registry.py
+    artifact: tool_registry.yaml
+    tool_count: 22
+
+  4_memory:
+    status: active
+    implementation: shared/memory.py
+    backend: Vertex AI Agent Engine (VertexAiSessionService) → InMemory fallback
+    artifact: memory_schema.yaml
+
+  5_policy_governance:
+    status: active
+    implementation: shared/governance.py + governance-rules.yaml
+    ledger: adk/trust-ledger.jsonl
+
+  6_human_override:
+    status: active
+    implementation: orchestrator.governance_gate()
+    gate_types: [Review, Approve, Escalate]
+
+  7_workflow:
+    status: active
+    implementation: pmo_daemon.py (scheduled loop)
+    artifact: workflow.yaml
+
+  8_observability:
+    status: active
+    implementation: shared/observability.py
+    destinations:
+      - Cloud Logging (logName: isrds/pmo-swarm)
+      - Cloud Monitoring (custom.googleapis.com/isrds/pmo-swarm/*)
+
+# ── Portable artifacts ────────────────────────────────────────────────────────
+artifacts:
+  - agent_spec.yaml          # this file
+  - prompts/orchestrator.md  # agent prompt
+  - tool_registry.yaml       # Layer 3
+  - memory_schema.yaml       # Layer 4
+  - governance-rules.yaml    # Layer 5 (at pmo-swarm root)
+  - workflow.yaml            # Layer 7

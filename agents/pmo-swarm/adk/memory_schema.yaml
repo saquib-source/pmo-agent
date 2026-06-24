@@ -1,0 +1,46 @@
+version: "1.0"
+artifact_type: memory_schema
+swarm: pmo-swarm
+tenant: ashs
+description: >
+  PMO agent persistent memory — stored in Vertex AI Agent Engine and recalled
+  across daemon runs.  Each namespace maps a key space to what the agent learns
+  over time.
+retention_days: 90
+
+namespaces:
+  tickets:
+    description: "Per-ticket interaction history"
+    keys:
+      last_contacted_at:    "ISO timestamp of last PMO-drafted comment"
+      contact_count:        "Total follow-ups sent to this ticket"
+      last_response_at:     "ISO timestamp of last assignee activity"
+      stall_duration_hours: "Running stall count at most recent scan"
+      escalated:            "true if ticket has been escalated"
+      hygiene_violations:   "List of hygiene issue codes found on last scan"
+
+  assignees:
+    description: "Per-person response patterns learned over time"
+    keys:
+      avg_response_hours:      "Rolling average hours to respond to PMO messages"
+      response_rate:           "Fraction of follow-ups that received a reply (0.0–1.0)"
+      last_active_at:          "Last observed Jira activity"
+      preferred_contact_day:   "Day of week (0=Mon) with highest response rate"
+      escalation_count:        "Times this person has been escalated over"
+
+  projects:
+    description: "Per-project health baselines"
+    keys:
+      avg_stall_count:      "Rolling average stalled tickets per scan"
+      hygiene_score:        "Running hygiene compliance rate (0.0–1.0)"
+      last_clean_scan_at:   "ISO timestamp of last scan with zero violations"
+      feature_pct_built:    "Last known % of features built (from feature_completeness)"
+
+  briefs:
+    description: "Summaries of past Operating Briefs"
+    keys:
+      brief_text:       "Full brief text"
+      scan_timestamp:   "ISO timestamp when brief was generated"
+      stall_count:      "Number of stalled tickets at time of brief"
+      gates_triggered:  "Number of approval gates opened in this cycle"
+      run_duration_ms:  "End-to-end cycle duration in milliseconds"

@@ -1,0 +1,84 @@
+version: "1.0"
+artifact_type: governance_rules
+swarm: pmo-swarm
+tenant: ashs
+description: >
+  Authority gradient rules for the PMO swarm.
+  Each rule maps an action name (as passed to governance_check()) to a decision:
+    allow  — agent may proceed without human input
+    gate   — agent must open a governance_gate() before proceeding
+    deny   — action is blocked unconditionally
+
+rules:
+
+  # ── Jira write operations ──────────────────────────────────────────────────
+  - action: post_comment
+    decision: gate
+    gate: Review
+    rationale: >
+      PMO comments are visible to all project stakeholders.
+      A human must confirm the draft is accurate and appropriately toned
+      before it appears in Jira.
+
+  - action: request_transition
+    decision: gate
+    gate: Approve
+    rationale: >
+      Ticket status transitions affect sprint metrics and downstream workflows.
+      Requires explicit human approval to prevent incorrect state changes.
+
+  - action: assign_ticket
+    decision: gate
+    gate: Approve
+    rationale: >
+      Reassigning ownership changes accountability records.
+      Must be approved by a human to ensure RACI integrity.
+
+  - action: escalate
+    decision: gate
+    gate: Escalate
+    rationale: >
+      Escalations are sent to leadership and must reflect a considered judgment.
+      Always requires human confirmation.
+
+  # ── Read-only operations ────────────────────────────────────────────────────
+  - action: run_jql
+    decision: allow
+    rationale: "Read-only query — no side-effects."
+
+  - action: get_issue
+    decision: allow
+    rationale: "Read-only fetch — no side-effects."
+
+  - action: search_active
+    decision: allow
+    rationale: "Read-only scan — no side-effects."
+
+  - action: find_stalled_issues
+    decision: allow
+    rationale: "Read-only scan — no side-effects."
+
+  - action: audit_raci_gaps
+    decision: allow
+    rationale: "Read-only audit — no side-effects."
+
+  - action: scan_hygiene
+    decision: allow
+    rationale: "Read-only scan — no side-effects."
+
+  - action: audit_features
+    decision: allow
+    rationale: "Read-only Firestore read — no side-effects."
+
+  - action: draft_followup_ping
+    decision: allow
+    rationale: "Drafting text is safe; post_comment is the gated action."
+
+  # ── Trust Ledger ────────────────────────────────────────────────────────────
+  - action: log_decision
+    decision: allow
+    rationale: "Append-only audit write — cannot modify existing records."
+
+  - action: read_ledger
+    decision: allow
+    rationale: "Read-only audit access."

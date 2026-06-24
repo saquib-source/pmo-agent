@@ -1,0 +1,23 @@
+# Never bake credentials into the image
+adk/.env
+adk/*.env
+adk/service-account.json
+adk/certs/
+
+# Runtime outputs — not needed in the image
+adk/briefs/
+adk/logs/
+adk/trust-ledger.jsonl
+
+# Python artifacts
+__pycache__/
+adk/__pycache__/
+adk/**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Dev tools
+.git/
+.vscode/
+*.md

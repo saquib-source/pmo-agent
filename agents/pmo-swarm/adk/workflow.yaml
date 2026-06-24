@@ -1,0 +1,87 @@
+version: "1.0"
+artifact_type: workflow_definition
+swarm: pmo-swarm
+tenant: ashs
+
+# ── Workflow: PMO Operating Brief ─────────────────────────────────────────────
+name: pmo_operating_brief
+display_name: "PMO Operating Brief"
+description: >
+  Recurring workflow that drives the PMO swarm.  The daemon wakes on a configurable
+  interval, fires all five skill agents through the orchestrator, and produces an
+  Operating Brief that is saved to adk/briefs/ and sent to the human operator.
+
+trigger:
+  type: scheduled
+  interval_minutes: 60        # overridable via Config Registry: scan_interval_minutes
+  daily_brief_hour: 7         # hour (0–23) for the expanded morning brief
+
+modes:
+  full:
+    description: "Full cycle — scan, hygiene, RACI, feature completeness, auto-chase if enabled"
+    steps:
+      - id: scan_board
+        agent: execution_tracking_agent
+        action: "Find all active and stalled tickets across configured Jira projects"
+        output: stalled_tickets, at_risk_tickets
+
+      - id: feature_audit
+        agent: feature_completeness_agent
+        action: "Audit Firestore navigation catalog for built vs unbuilt features"
+        output: feature_pct_built, unbuilt_features
+
+      - id: raci_audit
+        agent: ownership_raci_agent
+        action: "Find tickets with missing accountable or responsible owners"
+        output: raci_gaps
+
+      - id: hygiene_scan
+        agent: hygiene_agent
+        action: "Scan all tickets for hygiene violations"
+        output: hygiene_violations
+
+      - id: chase_drafting
+        agent: follow_up_agent
+        condition: "stalled_tickets.count > 0 AND auto_comment == true"
+        action: "Draft chase pings for tickets stalled > followup_threshold_hours"
+        gate: Review               # opens governance_gate(Review) before any post
+        output: chase_drafts
+
+      - id: synthesise_brief
+        agent: pmo_orchestrator
+        action: "Synthesise all findings into Operating Brief; save to briefs/"
+        output: operating_brief
+
+  brief_only:
+    description: "Read-only scan — no chase drafting, no gate triggers"
+    steps:
+      - id: scan_board
+        agent: execution_tracking_agent
+        action: "Find all active and stalled tickets"
+      - id: synthesise_brief
+        agent: pmo_orchestrator
+        action: "Write Operating Brief (report only)"
+
+# ── Thresholds (overridable via Config Registry) ──────────────────────────────
+thresholds:
+  watch_hours: 24              # stall_threshold_hours
+  followup_hours: 48           # followup_threshold_hours
+  escalate_hours: 72           # escalation_threshold_hours
+
+# ── Outputs ───────────────────────────────────────────────────────────────────
+outputs:
+  - path: adk/briefs/brief_<timestamp>.txt
+    description: Full Operating Brief text
+  - path: adk/briefs/latest.txt
+    description: Symlink-style copy of the most recent brief
+  - path: adk/trust-ledger.jsonl
+    description: Append-only audit log of every gate, decision, and escalation
+  - cloud_logging:
+      log_name: isrds/pmo-swarm
+      event_types: [agent_run_start, agent_run_complete, governance_gate_opened,
+                    decision_logged, gate, decision]
+  - cloud_monitoring:
+      metrics:
+        - custom.googleapis.com/isrds/pmo-swarm/agent_run_duration_ms
+        - custom.googleapis.com/isrds/pmo-swarm/agent_errors_total
+        - custom.googleapis.com/isrds/pmo-swarm/briefs_generated_total
