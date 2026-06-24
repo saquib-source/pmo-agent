@@ -6,7 +6,7 @@ Two-tier memory for the PMO swarm:
                         Uses VertexAiSessionService if VERTEX_AGENT_ENGINE_ID is set,
                         otherwise InMemorySessionService.
 
-  Tier 2 (cross-run):   AlloyDB agent_memory table with pgvector (768-dim embeddings).
+  Tier 2 (cross-run):   Cloud SQL Postgres agent_memory table with pgvector (768-dim embeddings).
                         The agent remembers per-ticket history, per-assignee patterns,
                         and project baselines across daemon restarts.
 
@@ -55,7 +55,7 @@ def get_session_service():
     return InMemorySessionService()
 
 
-# ── Tier 2 — AlloyDB pgvector (cross-run persistent memory) ──────────────────
+# ── Tier 2 — Cloud SQL Postgres pgvector (cross-run persistent memory) ──────────────────
 
 async def store_memory(
     namespace: str,
@@ -64,7 +64,7 @@ async def store_memory(
     metadata: Optional[dict] = None,
     embedding: Optional[list] = None,
 ) -> bool:
-    """Persist a memory entry to AlloyDB agent_memory table.
+    """Persist a memory entry to Cloud SQL Postgres agent_memory table.
 
     namespace: 'tickets' | 'assignees' | 'projects' | 'briefs'
     session_id: ticket key, assignee account ID, project key, or brief timestamp
@@ -205,7 +205,7 @@ def emit_schema_artifact(output_path: Optional[Path] = None) -> Path:
         "version": "1.0",
         "swarm": "pmo-swarm",
         "description": (
-            "PMO agent persistent memory — AlloyDB agent_memory table (pgvector). "
+            "PMO agent persistent memory — Cloud SQL Postgres agent_memory table (pgvector). "
             "Within-run context via ADK session service."
         ),
         "tier_1": {
@@ -216,7 +216,7 @@ def emit_schema_artifact(output_path: Optional[Path] = None) -> Path:
         "tier_2": {
             "type": "pgvector",
             "table": "agent_memory",
-            "database": "isrds_agentic (AlloyDB)",
+            "database": "isrds_agentic (Cloud SQL Postgres)",
             "embedding_dims": 768,
             "scope": "persistent across daemon restarts",
         },

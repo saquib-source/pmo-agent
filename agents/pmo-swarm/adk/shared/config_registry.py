@@ -3,10 +3,10 @@ Layer 1 — Config Registry
 Single source of truth for PMO swarm configuration.
 
 Priority order:
-  1. AlloyDB  config_registry table (role_category = 'PMO Orchestrator')
+  1. Cloud SQL Postgres  config_registry table (role_category = 'PMO Orchestrator')
   2. Environment variables (local dev / bootstrap)
 
-Call `await initialize()` once at daemon startup to pull from AlloyDB.
+Call `await initialize()` once at daemon startup to pull from Cloud SQL Postgres.
 All typed accessors are synchronous and read from the in-process cache,
 so they work before and after the async init.
 """
@@ -49,9 +49,9 @@ def _defaults() -> dict:
 # ── Async init — called once at daemon startup ─────────────────────────────────
 
 async def initialize() -> None:
-    """Load config from AlloyDB config_registry (role_category = 'PMO Orchestrator').
+    """Load config from Cloud SQL Postgres config_registry (role_category = 'PMO Orchestrator').
     Merges DB values on top of env-var defaults.
-    Falls back gracefully if AlloyDB is not available.
+    Falls back gracefully if Cloud SQL Postgres is not available.
     """
     global _cache
     _cache = _defaults()
@@ -60,7 +60,7 @@ async def initialize() -> None:
         from .db import get_pool
         pool = await get_pool()
         if pool is None:
-            log.info("Config Registry: AlloyDB unavailable — using env defaults")
+            log.info("Config Registry: Cloud SQL Postgres unavailable — using env defaults")
             return
 
         async with pool.acquire() as conn:
@@ -88,16 +88,16 @@ async def initialize() -> None:
             _cache["decision_class"] = row["decision_class"]  or _cache["decision_class"]
             if row["system_prompt"]:
                 _cache["system_prompt"] = row["system_prompt"]
-            log.info("Config Registry: loaded from AlloyDB — role='PMO Orchestrator'"
+            log.info("Config Registry: loaded from Cloud SQL Postgres — role='PMO Orchestrator'"
                      f"  model={_cache['agent_model']}  memory={_cache['memory_surface']}")
         else:
             log.warning(
-                "Config Registry: 'PMO Orchestrator' row not found in AlloyDB "
+                "Config Registry: 'PMO Orchestrator' row not found in Cloud SQL Postgres "
                 "— run migrations/004_pmo_swarm.sql, using env defaults"
             )
 
     except Exception as e:
-        log.warning(f"Config Registry: AlloyDB read failed ({e}) — using env defaults")
+        log.warning(f"Config Registry: Cloud SQL Postgres read failed ({e}) — using env defaults")
 
 
 # ── Sync getter (reads cache; lazy-initialises from env if called before init) ─

@@ -76,14 +76,14 @@ source .venv/bin/activate          # macOS/Linux
 # .venv\Scripts\activate           # Windows
 
 # 3. Install dependencies
-pip install -r agents/pmo-execution-agent/adk/requirements.txt
+pip install -r agents/pmo-swarm/adk/requirements.txt
 
 # 4. Set up your environment file
-cp agents/pmo-execution-agent/adk/.env.template agents/pmo-execution-agent/adk/.env
+cp agents/pmo-swarm/adk/.env.template agents/pmo-swarm/adk/.env
 # Edit the .env file with your real credentials (see Configuration section below)
 
 # 5. Run the agent (interactive web chat)
-cd agents/pmo-execution-agent/adk
+cd agents/pmo-swarm/adk
 adk web .
 ```
 
@@ -203,7 +203,7 @@ deactivate
 With your virtual environment activated (you should see `(.venv)` in your prompt), run:
 
 ```bash
-pip install -r agents/pmo-execution-agent/adk/requirements.txt
+pip install -r agents/pmo-swarm/adk/requirements.txt
 ```
 
 This installs the following packages:
@@ -233,18 +233,18 @@ The agent needs credentials and settings stored in a `.env` file. This file cont
 
 **Copy the template:**
 ```bash
-cp agents/pmo-execution-agent/adk/.env.template agents/pmo-execution-agent/adk/.env
+cp agents/pmo-swarm/adk/.env.template agents/pmo-swarm/adk/.env
 ```
 
 **Open the `.env` file in a text editor and fill in your values:**
 
 ```bash
 # macOS:
-open agents/pmo-execution-agent/adk/.env
+open agents/pmo-swarm/adk/.env
 
 # Or use any text editor:
-nano agents/pmo-execution-agent/adk/.env        # Terminal editor
-code agents/pmo-execution-agent/adk/.env         # VS Code
+nano agents/pmo-swarm/adk/.env        # Terminal editor
+code agents/pmo-swarm/adk/.env         # VS Code
 ```
 
 See the **[Configuration Reference](#-configuration-reference)** section below for what each variable means.
@@ -278,7 +278,7 @@ The agent uses **Gemini AI** through Google Cloud's Vertex AI. Here's how to set
 6. A `.json` file will download. **Save it in the project root** (it's gitignored — won't be committed).
 7. In your `.env` file, set the path **relative to the `adk/` directory**:
    ```
-   # Path goes: adk/ → pmo-execution-agent/ → agents/ → project root
+   # Path goes: adk/ → pmo-swarm/ → agents/ → project root
    GOOGLE_APPLICATION_CREDENTIALS=../../../your-downloaded-key.json
    GOOGLE_CLOUD_PROJECT=your-project-id
    ```
@@ -325,7 +325,7 @@ cd pmo-agent
 source .venv/bin/activate
 
 # 3. Navigate to the ADK directory
-cd agents/pmo-execution-agent/adk
+cd agents/pmo-swarm/adk
 
 # 4. Start the agent
 adk web .
@@ -362,7 +362,7 @@ cd pmo-agent
 source .venv/bin/activate
 
 # 3. Navigate to the ADK directory
-cd agents/pmo-execution-agent/adk
+cd agents/pmo-swarm/adk
 
 # 4. Run the daemon
 python pmo_daemon.py
@@ -429,25 +429,26 @@ pmo-agent/
 ├── .gitignore                         ← Files excluded from Git
 │
 └── agents/
-    └── pmo-execution-agent/
-        ├── agent-spec.yaml            ← Agent specification & metadata
+    └── pmo-swarm/
         ├── governance-rules.yaml      ← Rules for human approval gates
-        ├── memory-schema.json         ← Memory structure definition
-        ├── prompt.md                  ← Danielle's personality & instructions
-        ├── swarm-requirements.md      ← Multi-agent coordination rules
-        ├── tool-registry.yaml         ← Available tools registry
-        ├── workflow-definition.yaml   ← Workflow automation rules
+        ├── ARCHITECTURE.md            ← Architecture documentation
+        ├── DEPLOY.md                  ← Deployment guide
+        ├── Dockerfile                 ← Container build definition
+        ├── deploy.sh                  ← Deploy script
         │
         └── adk/                       ← 🔑 Runtime code (this is where you run from)
             ├── __init__.py            ← Python package entry point
-            ├── agent.py              ← Main agent code (Jira tools + Gemini)
-            ├── governance.py          ← Trust Ledger & governance gates
+            ├── orchestrator.py        ← Multi-agent orchestrator
             ├── pmo_daemon.py          ← Autonomous daemon (runs on its own)
+            ├── agent_spec.yaml        ← Agent specification & metadata
+            ├── memory_schema.yaml     ← Memory structure definition
+            ├── workflow.yaml          ← Workflow automation rules
             ├── requirements.txt       ← Python dependencies
             ├── .env.template          ← Template for environment variables
             ├── .env                   ← Your secrets (NEVER commit this!)
-            ├── trust-ledger.jsonl      ← Audit log of all agent actions
-            └── briefs/                ← Generated Operating Brief files
+            ├── agents/                ← Individual agent definitions
+            ├── prompts/               ← Agent prompts (Danielle's personality)
+            └── shared/                ← Shared modules (Jira, db, config registry, etc.)
 ```
 
 ---
@@ -473,7 +474,7 @@ pmo-agent/
 
 ## ⚙️ Configuration Reference
 
-All settings go in `agents/pmo-execution-agent/adk/.env`:
+All settings go in `agents/pmo-swarm/adk/.env`:
 
 ### Required Settings
 
@@ -521,7 +522,7 @@ All settings go in `agents/pmo-execution-agent/adk/.env`:
 # 1. Get your corporate CA certificate from your IT team (e.g., corporate-ca.crt)
 
 # 2. Combine it with Python's default certs:
-cd agents/pmo-execution-agent/adk
+cd agents/pmo-swarm/adk
 python3 -c "import certifi; print(certifi.where())"  # Find system certs
 cat $(python3 -c "import certifi; print(certifi.where())") corporate-ca.crt > combined-ca-certs.pem
 
@@ -553,7 +554,7 @@ Your virtual environment isn't activated, or dependencies aren't installed.
 source .venv/bin/activate
 
 # Reinstall:
-pip install -r agents/pmo-execution-agent/adk/requirements.txt
+pip install -r agents/pmo-swarm/adk/requirements.txt
 ```
 
 ### "Jira not configured. Set JIRA_URL, JIRA_EMAIL, JIRA_API_TOKEN in .env"
@@ -562,10 +563,10 @@ Your `.env` file is missing or incomplete.
 
 ```bash
 # Check it exists:
-cat agents/pmo-execution-agent/adk/.env
+cat agents/pmo-swarm/adk/.env
 
 # If not, create it:
-cp agents/pmo-execution-agent/adk/.env.template agents/pmo-execution-agent/adk/.env
+cp agents/pmo-swarm/adk/.env.template agents/pmo-swarm/adk/.env
 # Then edit with your real values
 ```
 
@@ -590,7 +591,7 @@ Your GCP service account key isn't set up correctly.
 
 ```bash
 # Verify the file exists (relative to adk/ directory):
-ls -la agents/pmo-execution-agent/adk/../../../your-service-account.json
+ls -la agents/pmo-swarm/adk/../../../your-service-account.json
 
 # Make sure it's set in .env (use relative path from adk/ directory):
 GOOGLE_APPLICATION_CREDENTIALS=../../../your-service-account.json
@@ -606,7 +607,7 @@ GOOGLE_APPLICATION_CREDENTIALS=/full/path/to/your-service-account.json
 rm -rf .venv
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r agents/pmo-execution-agent/adk/requirements.txt
+pip install -r agents/pmo-swarm/adk/requirements.txt
 ```
 
 ### Port Already in Use (when running `adk web .`)

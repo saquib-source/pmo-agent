@@ -51,7 +51,7 @@ def _get_gcp_logger():
             try:
                 from google.cloud import logging as gcp_logging
                 _gcp_log_client = gcp_logging.Client(project=project)
-                _gcp_logger = _gcp_log_client.logger(f"isrds/{_SWARM}")
+                _gcp_logger = _gcp_log_client.logger(f"isrds-{_SWARM}")
             except Exception as e:
                 log.warning(f"Observability: Cloud Logging unavailable ({e})")
                 _gcp_logger = False

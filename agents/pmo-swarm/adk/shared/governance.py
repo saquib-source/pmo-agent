@@ -4,7 +4,7 @@ Layer 5 — Policy/Governance: governance-rules.yaml + authority gradient + trus
 
 Trust Ledger write order (all three happen on every entry):
   1. Local JSONL  — immediate, sync, always works (adk/trust-ledger.jsonl)
-  2. AlloyDB      — async, fire-and-forget to trust_ledger table (system of record)
+  2. Cloud SQL Postgres      — async, fire-and-forget to trust_ledger table (system of record)
   3. Cloud Logging — async, fire-and-forget via observability (Layer 8)
 """
 import json
@@ -31,7 +31,7 @@ LEDGER_FILE = os.environ.get(
     str(_AGENT_DIR / "adk" / "trust-ledger.jsonl"),
 )
 
-# Map internal entry_type labels → AlloyDB event_type enum
+# Map internal entry_type labels → Cloud SQL Postgres event_type enum
 _EVENT_TYPE_MAP = {
     "gate":        "ESCALATION_PENDING",
     "decision":    "REPORTED_DECISION",
@@ -57,7 +57,7 @@ def governance_check(action: str, is_irreversible: bool = False) -> dict:
     return {"allowed": True, "gate": None, "reason": "Permitted"}
 
 
-# ── AlloyDB trust_ledger insert (async, called via fire_and_forget) ───────────
+# ── Cloud SQL Postgres trust_ledger insert (async, called via fire_and_forget) ───────────
 
 async def _db_insert_trust_ledger(
     tenant_id: str,
@@ -86,10 +86,10 @@ async def _db_insert_trust_ledger(
                 json.dumps({"detail": detail[:500]}),
             )
     except Exception as e:
-        # AlloyDB write failure is non-fatal — local JSONL is the backup
+        # Cloud SQL Postgres write failure is non-fatal — local JSONL is the backup
         import logging
         logging.getLogger(__name__).warning(
-            f"trust_ledger AlloyDB write failed ({e}) — local JSONL preserved"
+            f"trust_ledger Cloud SQL Postgres write failed ({e}) — local JSONL preserved"
         )
 
 
@@ -107,7 +107,7 @@ def trust_ledger_log(entry_type: str, detail: str, agent_id: str = "pmo_swarm") 
     with open(LEDGER_FILE, "a") as f:
         f.write(json.dumps(entry) + "\n")
 
-    # 2. AlloyDB trust_ledger table — async fire-and-forget
+    # 2. Cloud SQL Postgres trust_ledger table — async fire-and-forget
     try:
         from .config_registry import get_tenant_id, get_decision_class
         from .db import fire_and_forget
@@ -131,8 +131,80 @@ def trust_ledger_log(entry_type: str, detail: str, agent_id: str = "pmo_swarm") 
     _obs_log(entry_type, detail, agent_id=agent_id)
 
 
+async def _ensure_pending_actions_table() -> None:
+    from .db import get_pool
+    pool = await get_pool()
+    if pool is None:
+        return
+    async with pool.acquire() as conn:
+        await conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS pending_actions (
+              id            UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+              tenant_id     TEXT        NOT NULL,
+              swarm_id      TEXT        NOT NULL DEFAULT 'pmo-swarm',
+              agent_id      TEXT        NOT NULL,
+              action_type   TEXT        NOT NULL,   -- 'comment' | 'transition'
+              ticket_key    TEXT        NOT NULL,
+              assignee_name TEXT,
+              assignee_id   TEXT,
+              message       TEXT        NOT NULL,    -- the REAL, ready-to-post body
+              urgency       TEXT,
+              status        TEXT        NOT NULL DEFAULT 'pending',  -- pending|approved|declined
+              created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+              resolved_at   TIMESTAMPTZ,
+              resolved_by   TEXT
+            )
+            """
+        )
+
+
+async def _insert_pending_action(
+    tenant_id: str, agent_id: str, action_type: str, ticket_key: str,
+    message: str, assignee_name: str = "", assignee_id: str = "", urgency: str = "",
+) -> None:
+    from .db import get_pool
+    await _ensure_pending_actions_table()
+    pool = await get_pool()
+    if pool is None:
+        return
+    async with pool.acquire() as conn:
+        # Avoid duplicate pending rows for the same ticket+message.
+        await conn.execute(
+            """
+            INSERT INTO pending_actions
+              (tenant_id, agent_id, action_type, ticket_key,
+               assignee_name, assignee_id, message, urgency)
+            SELECT $1,$2,$3,$4,$5,$6,$7,$8
+            WHERE NOT EXISTS (
+              SELECT 1 FROM pending_actions
+              WHERE ticket_key=$4 AND status='pending' AND message=$7
+            )
+            """,
+            tenant_id, agent_id, action_type, ticket_key,
+            assignee_name, assignee_id, message, urgency,
+        )
+
+
+def queue_pending_action(
+    agent_id: str, action_type: str, ticket_key: str, message: str,
+    assignee_name: str = "", assignee_id: str = "", urgency: str = "",
+) -> None:
+    """Persist a fully-formed, ready-to-post action for human approval (fire-and-forget).
+    The UI reads pending_actions and posts `message` verbatim — so what gets posted to
+    Jira is the actual human-voiced message, not a meta description."""
+    try:
+        from .config_registry import get_tenant_id
+        from .db import fire_and_forget
+        fire_and_forget(_insert_pending_action(
+            get_tenant_id(), agent_id, action_type, ticket_key,
+            message, assignee_name, assignee_id, urgency))
+    except Exception:
+        pass
+
+
 def trust_ledger_read(last_n: int = 50) -> list:
-    """Read from local JSONL (fast path). AlloyDB is the durable store for reporting."""
+    """Read from local JSONL (fast path). Cloud SQL Postgres is the durable store for reporting."""
     if not os.path.exists(LEDGER_FILE):
         return []
     with open(LEDGER_FILE) as f:
@@ -147,7 +219,7 @@ def trust_ledger_read(last_n: int = 50) -> list:
 
 
 async def trust_ledger_read_db(last_n: int = 50, tenant_id: str = "") -> list:
-    """Read trust ledger from AlloyDB — used for reporting and the Operating Brief."""
+    """Read trust ledger from Cloud SQL Postgres — used for reporting and the Operating Brief."""
     try:
         from .db import get_pool
         from .config_registry import get_tenant_id

@@ -54,15 +54,14 @@ def search_active(project: str = "", max_results: int = 50) -> dict:
     """Quick scan of all active (not Done) tickets in a project.
 
     Args:
-        project: Jira project key. Defaults to ISRDS. Use 'ALL' to span all 8 projects.
+        project: Jira project key. Omit or pass 'ALL' to scan all configured projects.
         max_results: Cap on results.
     """
-    if project.upper() == "ALL":
+    if not project or project.upper() == "ALL":
         proj_jql = " OR ".join(f'project = "{p}"' for p in jc.ALL_PROJECTS)
         jql = f'({proj_jql}) AND statusCategory != Done ORDER BY priority DESC, updated ASC'
     else:
-        proj = project or "ISRDS"
-        jql = f'project = "{proj}" AND statusCategory != Done ORDER BY priority DESC, updated ASC'
+        jql = f'project = "{project}" AND statusCategory != Done ORDER BY priority DESC, updated ASC'
     return jc.run_jql(jql, max_results)
 
 
@@ -71,9 +70,9 @@ def find_stalled_issues(hours_threshold: int = 24, project: str = "") -> dict:
 
     Args:
         hours_threshold: Inactivity threshold in hours (default 24).
-        project: Project key, or 'ALL' for all 8 projects.
+        project: Project key, or omit/'ALL' to scan all configured projects.
     """
-    projects = jc.ALL_PROJECTS if project.upper() == "ALL" else ([project] if project else None)
+    projects = None if (not project or project.upper() == "ALL") else [project]
     return jc.find_stalled(hours_threshold, projects)
 
 

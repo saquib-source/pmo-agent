@@ -54,7 +54,7 @@ from .shared.config_registry import (
     get_scan_interval, get_brief_hour, get_auto_comment,
     get_jira_projects, get_tenant_id,
 )
-from .shared.db import get_pool as get_db_pool               # AlloyDB
+from .shared.db import get_pool as get_db_pool               # Cloud SQL Postgres
 from .shared.analytics import (                              # BigQuery — primary data store
     ensure_dataset_and_tables,
     log_cycle_metrics,
@@ -93,12 +93,12 @@ _runner: Runner | None = None
 
 async def _startup() -> None:
     """Called once before the first cycle.
-    Loads config from AlloyDB, opens DB pool, wires session service + runner.
+    Loads config from Cloud SQL Postgres, opens DB pool, wires session service + runner.
     """
     global _session_service, _runner
     global SCAN_INTERVAL, BRIEF_HOUR, AUTO_COMMENT, JIRA_PROJECTS, JIRA_PROJECT
 
-    # Layer 1 — pull config from AlloyDB config_registry
+    # Layer 1 — pull config from Cloud SQL Postgres config_registry
     await config_registry.initialize()
     # Refresh module-level vars now that DB config is loaded
     SCAN_INTERVAL = get_scan_interval()
@@ -107,7 +107,7 @@ async def _startup() -> None:
     JIRA_PROJECTS = get_jira_projects()
     JIRA_PROJECT  = JIRA_PROJECTS[0] if JIRA_PROJECTS else "ISRDS"
 
-    # Layer 4 — open AlloyDB pool (used by governance, memory, brief saving)
+    # Layer 4 — open Cloud SQL Postgres pool (used by governance, memory, brief saving)
     await get_db_pool()
 
     # BigQuery — ensure isrds_pmo dataset + tables exist
@@ -166,7 +166,7 @@ async def _save_brief_to_db(
     brief_text: str,
     elapsed_seconds: float,
 ) -> None:
-    """Insert the Operating Brief into AlloyDB daily_briefings table."""
+    """Insert the Operating Brief into Cloud SQL Postgres daily_briefings table."""
     try:
         pool = await get_db_pool()
         if pool is None:
@@ -188,7 +188,7 @@ async def _save_brief_to_db(
                 brief_text[:50000],
                 "PMO Orchestrator",
             )
-        log.info(f"Brief saved to AlloyDB daily_briefings — {brief_date}")
+        log.info(f"Brief saved to Cloud SQL Postgres daily_briefings — {brief_date}")
     except Exception as e:
         log.warning(f"daily_briefings DB write failed ({e}) — local file preserved")
 
@@ -205,9 +205,13 @@ def _build_brief_prompt(mode: str = "full") -> str:
         )
     auto_chase_instruction = (
         "For tickets stalled >48h and Critical/High priority, draft chase pings "
-        "and surface them for my approval before posting."
+        "and post them directly (auto-comment is ON)."
         if AUTO_COMMENT else
-        "Do NOT draft or post chase comments (auto-comment is off). Report only."
+        # Default: DRAFT messages and queue them for human approval. Do NOT post.
+        "For every ticket stalled >24h, call `draft_followup_ping` with a complete, "
+        "human-voiced message written as Danielle (warm, direct, references the ticket "
+        "summary and how long it's been stalled, no greeting, no sign-off). This queues "
+        "the message for human approval — do NOT post it yourself. Draft one per stalled ticket."
     )
     return (
         f"It is {now}. Run the full PMO Operating Brief cycle for projects: {projects_str}. "
@@ -296,7 +300,7 @@ async def run_cycle(mode: str = "full") -> str:
     except Exception as e:
         log.warning(f"BigQuery metrics write failed: {e}")
 
-    # AlloyDB — backup: daily_briefings (kept for operational fast reads)
+    # Cloud SQL Postgres — backup: daily_briefings (kept for operational fast reads)
     await _save_brief_to_db(start.date(), response, elapsed)
 
     log.info("=" * 80)

@@ -5,6 +5,7 @@ and synthesises findings into Operating Briefs.
 
 ADK entry point: `adk web .` from this directory discovers root_agent via __init__.py.
 """
+import logging
 from pathlib import Path
 
 from google.adk.agents import LlmAgent
@@ -21,6 +22,8 @@ from .shared.config_registry      import get_agent_model, get_tenant_id
 from .shared.observability        import log_event as obs_log
 from .shared.tool_registry        import registry as tool_registry
 from .shared.db                   import fire_and_forget
+
+log = logging.getLogger(__name__)
 
 _PROMPT_PATH = Path(__file__).parent / "prompts" / "orchestrator.md"
 _PROMPT = _PROMPT_PATH.read_text() if _PROMPT_PATH.exists() else "You are the PMO Orchestrator."
@@ -49,12 +52,19 @@ def governance_gate(gate_type: str, description: str, ticket_key: str = "") -> d
         severity="WARNING",
         extra={"gate_type": gate_type, "ticket_key": ticket_key},
     )
+    # Enhanced logging — a single, trivially-greppable line so a human reviewer can
+    # find every pending approval with: grep "PENDING_APPROVAL" in Cloud Logging.
+    log.warning(
+        "⏸ PENDING_APPROVAL | gate=%s | ticket=%s | action_awaiting_human=%r",
+        gate_type, ticket_key or "-", description,
+    )
     return {
         "gate_type":   gate_type,
         "description": description,
         "ticket_key":  ticket_key,
         "status":      "pending",
-        "message":     f"⏸ {gate_type} gate — awaiting human decision.",
+        "message":     f"⏸ {gate_type} gate — awaiting human decision. "
+                       f"Approve via: python -m adk.approve {ticket_key}",
     }
 
 

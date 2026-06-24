@@ -15,7 +15,7 @@ from google.adk.tools import FunctionTool
 from google.adk.tools.agent_tool import AgentTool
 
 from ..shared import jira_client as jc
-from ..shared.governance import trust_ledger_log, governance_check
+from ..shared.governance import trust_ledger_log, governance_check, queue_pending_action
 from .ownership_raci import ownership_raci_agent
 
 _PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "follow_up.md"
@@ -47,6 +47,17 @@ def draft_followup_ping(
         "draft-ping",
         f"Drafted {urgency} for {ticket_key} → {assignee} ({stalled_hours}h)",
         agent_id="pmo_follow_up",
+    )
+    # Persist the REAL, human-voiced message for human approval. The UI posts this
+    # `message` verbatim — so what lands on Jira is Danielle's actual note, not a
+    # meta description of what was drafted.
+    queue_pending_action(
+        agent_id="pmo_follow_up",
+        action_type="comment",
+        ticket_key=ticket_key,
+        message=message,
+        assignee_name=assignee,
+        urgency=urgency,
     )
     return {
         "ticket_key":    ticket_key,

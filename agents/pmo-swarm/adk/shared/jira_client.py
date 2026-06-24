@@ -9,7 +9,19 @@ from pathlib import Path
 
 # ── Config ──────────────────────────────────────────────────────────────────
 
-ALL_PROJECTS = ["ASHS", "BAS", "BTK", "FQ", "ISRDS", "MDP", "SOC", "UNCS"]
+def _get_allowed_projects() -> list:
+    """Return the list of projects this swarm is authorised to scan.
+    Reads JIRA_PROJECTS env var; falls back to all known projects only if
+    the env var is absent (production always sets it).
+    """
+    raw = os.environ.get("JIRA_PROJECTS", "")
+    if raw:
+        return [p.strip() for p in raw.split(",") if p.strip()]
+    return ["ASHS", "BAS", "BTK", "FQ", "ISRDS", "MDP", "SOC", "UNCS"]
+
+# Evaluated at import time — agents reference this for the "ALL" shorthand.
+# Because JIRA_PROJECTS is set in .env before any import, this is safe.
+ALL_PROJECTS = _get_allowed_projects()
 
 RACI_FIELDS = {
     "accountable":  "customfield_11661",
@@ -356,7 +368,7 @@ def get_project_members(project: str = "") -> dict:
 # ── Stall / activity helpers ─────────────────────────────────────────────────
 
 def find_stalled(hours_threshold: int = 24, projects: list = None) -> dict:
-    proj_list = projects or [_config()[3]]
+    proj_list = projects or ALL_PROJECTS
     proj_jql  = " OR ".join(f'project = "{p}"' for p in proj_list)
     cutoff    = (datetime.now(timezone.utc) - timedelta(hours=hours_threshold)).strftime("%Y-%m-%d %H:%M")
 
@@ -382,7 +394,7 @@ def find_stalled(hours_threshold: int = 24, projects: list = None) -> dict:
 
 
 def get_changes_since(hours: int = 24, projects: list = None) -> dict:
-    proj_list = projects or [_config()[3]]
+    proj_list = projects or ALL_PROJECTS
     proj_jql  = " OR ".join(f'project = "{p}"' for p in proj_list)
     cutoff    = (datetime.now(timezone.utc) - timedelta(hours=hours)).strftime("%Y-%m-%d %H:%M")
 

@@ -1,7 +1,7 @@
 """
 BigQuery — primary destination for all agent-generated data.
 
-AlloyDB keeps: config_registry (startup reads) + agent_memory (pgvector).
+Cloud SQL Postgres keeps: config_registry (startup reads) + agent_memory (pgvector).
 BigQuery keeps: everything the agent produces.
 
 Dataset: isrds_pmo

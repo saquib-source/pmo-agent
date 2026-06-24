@@ -22,6 +22,13 @@ try:
 except ImportError:
     pass
 
-from .orchestrator import root_agent
+# `root_agent` is imported lazily so that lightweight consumers (e.g. the
+# Control UI importing adk.shared.*) don't pull in the full ADK orchestrator.
+# `adk web .` and `from adk import root_agent` still work via __getattr__.
+def __getattr__(name):
+    if name == "root_agent":
+        from .orchestrator import root_agent
+        return root_agent
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 __all__ = ["root_agent"]
