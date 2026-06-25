@@ -31,9 +31,19 @@ def get_raci(issue_key: str) -> dict:
     issue = jc.get_issue_detail(issue_key)
     if "error" in issue:
         return issue
+    raci = issue.get("raci", {}) or {}
+    acc = (raci.get("accountable") or {}).get("name") or "—"
+    res = (raci.get("responsible") or {}).get("name") or "—"
+    # Telemetry: record the RACI lookup so the dashboard reflects real activity and
+    # we can confirm Follow-up consults ownership before drafting.
+    trust_ledger_log(
+        "raci",
+        f"Resolved RACI for {issue_key}: Accountable={acc}, Responsible={res}",
+        agent_id="pmo_raci",
+    )
     return {
         "key":   issue_key,
-        "raci":  issue.get("raci", {}),
+        "raci":  raci,
         "owner": issue.get("assignee"),
         "url":   issue.get("url", ""),
     }
@@ -72,12 +82,21 @@ def audit_raci_gaps(project: str = "", max_results: int = 100) -> dict:
         if not raci.get("responsible"):
             no_responsible.append(key)
 
+    gap_count = len(set(no_assignee + no_accountable + no_responsible))
+    # Telemetry: record the audit so the dashboard shows RACI activity.
+    trust_ledger_log(
+        "raci",
+        f"RACI gap audit: {result['total']} scanned, {gap_count} with gaps "
+        f"(no-assignee={len(no_assignee)}, no-accountable={len(no_accountable)}, "
+        f"no-responsible={len(no_responsible)})",
+        agent_id="pmo_raci",
+    )
     return {
         "total_scanned":    result["total"],
         "no_assignee":      no_assignee,
         "no_accountable":   no_accountable,
         "no_responsible":   no_responsible,
-        "gap_count":        len(set(no_assignee + no_accountable + no_responsible)),
+        "gap_count":        gap_count,
     }
 
 
