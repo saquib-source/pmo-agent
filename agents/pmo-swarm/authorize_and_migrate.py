@@ -28,6 +28,7 @@ MIGRATION_FILES = [
     "002_survey.sql",
     "003_seed_config_registry.sql",
     "004_pmo_swarm.sql",
+    "005_ticket_interactions.sql",
 ]
 
 # ─── Auth ────────────────────────────────────────────────────────────────────

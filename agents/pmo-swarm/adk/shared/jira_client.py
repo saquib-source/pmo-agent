@@ -39,6 +39,17 @@ RACI_FIELDS = {
 
 HYGIENE_ISSUE_TYPE = "Configured Component"
 
+# Follow-up eligibility policy.
+# Danielle only chases work that is genuinely "in flight": assigned to an active
+# sprint AND in the In-Progress status category. This deliberately excludes:
+#   • Backlog tickets       — not in any active sprint → no sprint commitment to chase
+#   • Done tickets          — work is complete; commenting is noise
+#   • To Do tickets         — not started; not yet a "stall", nothing to follow up on
+# These rules are enforced both at discovery time (find_stalled JQL) and as a hard
+# write-time guard (is_comment_eligible) so a misbehaving agent cannot bypass them.
+ELIGIBLE_STATUS_CATEGORY = "In Progress"   # Jira statusCategory.name for active work
+SKIP_STATUS_CATEGORIES   = ("Done", "To Do")  # complete, or not-yet-started
+
 
 def _config():
     return (
@@ -255,6 +266,71 @@ def _extract_raci(fields: dict) -> dict:
     }
 
 
+# ── Follow-up eligibility (write-time guard) ──────────────────────────────────
+
+# Sprint custom-field id. Detected for this instance (lixillabs) as customfield_10007;
+# overridable via JIRA_SPRINT_FIELD for other instances. Run detect_sprint_field.py to find it.
+SPRINT_FIELD = os.environ.get("JIRA_SPRINT_FIELD", "customfield_10007")
+
+
+def _in_open_sprint(sprint_val) -> bool:
+    """True if the issue is assigned to at least one currently-active sprint.
+
+    The sprint field is a list of sprint objects (or GreenHopper strings on older
+    instances). A ticket with no sprint, or only closed/future sprints, is backlog
+    work and must not be chased.
+    """
+    if not sprint_val:
+        return False
+    if isinstance(sprint_val, dict):
+        sprint_val = [sprint_val]
+    if not isinstance(sprint_val, list):
+        sprint_val = [sprint_val]
+    for s in sprint_val:
+        if isinstance(s, dict):
+            if str(s.get("state", "")).lower() == "active":
+                return True
+        elif isinstance(s, str) and "state=ACTIVE" in s:
+            return True
+    return False
+
+
+def is_comment_eligible(issue_key: str) -> dict:
+    """Hard gate: may Danielle comment on / chase this ticket?
+
+    Re-fetches the live ticket and enforces the follow-up policy regardless of how
+    the caller discovered it. Returns {"eligible": bool, "reason": str, "status": str}.
+
+    Blocks when the ticket is:
+      • Done or To Do (by statusCategory), or
+      • not in any currently-active sprint (i.e. backlog).
+    """
+    data = jira_request("GET", f"/issue/{issue_key}", params={
+        "fields": f"status,{SPRINT_FIELD}",
+    })
+    if "error" in data:
+        # Fail closed — if we can't verify eligibility, don't comment.
+        return {"eligible": False, "reason": f"could not verify ticket: {data['error']}", "status": ""}
+
+    fields   = data.get("fields", {})
+    status   = fields.get("status", {}) or {}
+    category = (status.get("statusCategory", {}) or {}).get("name", "")
+    status_n = status.get("name", "")
+
+    if category in SKIP_STATUS_CATEGORIES:
+        kind = "Done" if category == "Done" else "To Do"
+        return {"eligible": False,
+                "reason": f"ticket is {kind} (status '{status_n}') — policy: do not comment on {kind} tickets",
+                "status": status_n}
+
+    if not _in_open_sprint(fields.get(SPRINT_FIELD)):
+        return {"eligible": False,
+                "reason": "ticket is in the backlog (no active sprint) — policy: do not follow up on backlog tickets",
+                "status": status_n}
+
+    return {"eligible": True, "reason": "in active sprint and in progress", "status": status_n}
+
+
 # ── Write operations ─────────────────────────────────────────────────────────
 
 def add_comment_adf(issue_key: str, text: str, assignee_name: str = None,
@@ -264,6 +340,16 @@ def add_comment_adf(issue_key: str, text: str, assignee_name: str = None,
     with a proper ADF @mention; otherwise falls back to plain text.
     """
     from .governance import trust_ledger_log
+
+    # Single enforcement chokepoint. Every posting path — the follow-up agent, the
+    # CLI approver, and the UI approver — funnels through here, so the eligibility
+    # policy (no Done/To Do, no backlog) holds with or without human approval.
+    elig = is_comment_eligible(issue_key)
+    if not elig["eligible"]:
+        trust_ledger_log("skip-comment", f"Blocked comment on {issue_key}: {elig['reason']}",
+                         agent_id="pmo_follow_up")
+        return {"skipped": True, "issue_key": issue_key, "reason": elig["reason"],
+                "message": f"Comment not posted — {elig['reason']}."}
 
     paragraphs = text.strip().split("\n\n")
     content = []
@@ -372,7 +458,12 @@ def find_stalled(hours_threshold: int = 24, projects: list = None) -> dict:
     proj_jql  = " OR ".join(f'project = "{p}"' for p in proj_list)
     cutoff    = (datetime.now(timezone.utc) - timedelta(hours=hours_threshold)).strftime("%Y-%m-%d %H:%M")
 
-    jql = (f'({proj_jql}) AND statusCategory != Done '
+    # Only chase work that is in an OPEN sprint and actively In Progress.
+    # `sprint in openSprints()` excludes backlog (no active sprint commitment);
+    # `statusCategory = "In Progress"` excludes both Done and To Do tickets.
+    # See ELIGIBLE_STATUS_CATEGORY / SKIP_STATUS_CATEGORIES for the policy rationale.
+    jql = (f'({proj_jql}) AND sprint in openSprints() '
+           f'AND statusCategory = "{ELIGIBLE_STATUS_CATEGORY}" '
            f'AND updated <= "{cutoff}" ORDER BY priority DESC, updated ASC')
     result = run_jql(jql, max_results=100)
     if "error" in result:

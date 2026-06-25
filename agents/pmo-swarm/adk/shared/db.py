@@ -24,18 +24,24 @@ from typing import Optional
 
 log = logging.getLogger(__name__)
 
-_pool = None
 _connector = None     # Cloud SQL Connector instance (kept alive with pool)
 _available: Optional[bool] = None
+# asyncpg pools are bound to the event loop that created them. ADK tools run in
+# their own worker-thread loops (see follow_up._run_async), so cache one pool per
+# loop id rather than a single global — reusing a pool across loops corrupts state.
+_pools: dict = {}
 
 
 async def get_pool():
-    """Return a live asyncpg pool, or None if DB is not configured."""
-    global _pool, _connector, _available
+    """Return a live asyncpg pool for the current event loop, or None if unconfigured."""
+    global _connector, _available
     if _available is False:
         return None
-    if _pool is not None:
-        return _pool
+
+    loop_key = id(asyncio.get_event_loop())
+    existing = _pools.get(loop_key)
+    if existing is not None:
+        return existing
 
     try:
         import asyncpg
@@ -65,7 +71,7 @@ async def get_pool():
     if instance:
         socket_dir = f"/cloudsql/{instance}"
         try:
-            _pool = await asyncpg.create_pool(
+            pool = await asyncpg.create_pool(
                 host=socket_dir,           # asyncpg looks for .s.PGSQL.5432 here
                 port=5432,
                 database=db_name,
@@ -76,14 +82,14 @@ async def get_pool():
                 init=_init_conn,
             )
             _available = True
+            _pools[loop_key] = pool
             log.info(
                 f"Cloud SQL Postgres pool ready (Unix socket) — instance={instance} "
                 f"db={db_name} user={db_user} tenant={tenant} pool[min=1,max=5]"
             )
-            return _pool
+            return pool
         except Exception as e:
-            log.warning(f"Cloud SQL: Unix socket pool failed ({e}) — DB disabled")
-            _available = False
+            log.warning(f"Cloud SQL: Unix socket pool failed ({e}) — DB unavailable this loop")
             return None
 
     # ── Path 2: Direct TCP (local dev) ────────────────────────────────────────
@@ -94,7 +100,7 @@ async def get_pool():
         return None
 
     try:
-        _pool = await asyncpg.create_pool(
+        pool = await asyncpg.create_pool(
             host=host,
             port=int(os.environ.get("CLOUD_SQL_PORT") or os.environ.get("ALLOYDB_PORT", "5432")),
             database=db_name,
@@ -106,13 +112,12 @@ async def get_pool():
             ssl="require",
         )
         _available = True
+        _pools[loop_key] = pool
         log.info(f"Cloud SQL Postgres pool ready (TCP) — {host}/{db_name} user={db_user} tenant={tenant}")
+        return pool
     except Exception as e:
         log.warning(f"DB: pool failed ({e}) — falling back to local storage")
-        _available = False
-        _pool = None
-
-    return _pool
+        return None
 
 
 def fire_and_forget(coro) -> None:
