@@ -93,12 +93,16 @@ def scan_hygiene(project: str = "", max_results: int = 50) -> dict:
         project: Jira project key (default ISRDS). Use 'ALL' for all 8 projects.
         max_results: Tickets to inspect (default 50).
     """
+    # Only police hygiene on work that is genuinely in flight: active sprint AND
+    # In Progress. Excludes backlog (no active sprint), Done, and To Do — matching
+    # the follow-up eligibility policy, so we never draft notes we won't post.
+    elig = 'sprint in openSprints() AND statusCategory = "In Progress"'
     if project.upper() == "ALL":
         proj_jql = " OR ".join(f'project = "{p}"' for p in jc.ALL_PROJECTS)
-        jql = f'({proj_jql}) AND statusCategory != Done ORDER BY priority DESC'
+        jql = f'({proj_jql}) AND {elig} ORDER BY priority DESC'
     else:
         proj = project or "ISRDS"
-        jql = f'project = "{proj}" AND statusCategory != Done ORDER BY priority DESC'
+        jql = f'project = "{proj}" AND {elig} ORDER BY priority DESC'
 
     result = jc.run_jql(jql, max_results, extra_fields=[
         "timeoriginalestimate", "duedate", "parent",

@@ -192,8 +192,24 @@ def queue_pending_action(
 ) -> None:
     """Persist a fully-formed, ready-to-post action for human approval (fire-and-forget).
     The UI reads pending_actions and posts `message` verbatim — so what gets posted to
-    Jira is the actual human-voiced message, not a meta description."""
+    Jira is the actual human-voiced message, not a meta description.
+
+    SINGLE ELIGIBILITY CHOKEPOINT: every comment draft path funnels through here
+    (stall chase, hygiene notify, reply interpretation). Comments on ineligible
+    tickets — backlog (no active sprint), Done, or To Do — are dropped here so they
+    never reach the human approval queue, not just blocked at post time."""
     try:
+        if action_type == "comment":
+            from . import jira_client as jc
+            elig = jc.is_comment_eligible(ticket_key)
+            if not elig["eligible"]:
+                trust_ledger_log(
+                    "skip-followup",
+                    f"Did not queue comment on {ticket_key}: {elig['reason']}",
+                    agent_id=agent_id,
+                )
+                return
+
         from .config_registry import get_tenant_id
         from .db import fire_and_forget
         fire_and_forget(_insert_pending_action(
