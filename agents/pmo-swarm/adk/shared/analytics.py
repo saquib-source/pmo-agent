@@ -1,7 +1,12 @@
 """
 BigQuery — primary destination for all agent-generated data.
 
-Cloud SQL Postgres keeps: config_registry (startup reads) + agent_memory (pgvector).
+Cloud SQL Postgres keeps: config_registry, authority_gradient_versions,
+  configured_swarm_instances (startup config + RLS state machines),
+  pending_actions, escalation_queue (human-approval workflows),
+  agent_memory (pgvector semantic search),
+  ticket_interactions (per-ticket decision gate reads).
+
 BigQuery keeps: everything the agent produces.
 
 Dataset: isrds_pmo
@@ -13,6 +18,8 @@ Tables:
   hygiene_findings   — structured hygiene violations per scan
   raci_gaps          — structured RACI gaps per scan
   feature_snapshot   — feature build % per division per scan
+  inter_agent_trace  — source→target agent calls with payload + latency
+  tool_call_audit    — per-tool invocation log (name, status, duration)
 """
 import logging
 from datetime import datetime, timezone
@@ -277,6 +284,59 @@ async def log_feature_snapshot(
     log.info(f"BigQuery: {len(rows)} feature snapshot rows written for {cycle_ts.date()}")
 
 
+# ── inter_agent_trace ─────────────────────────────────────────────────────────
+
+async def log_inter_agent_trace(
+    trace_id: str,
+    source_role: str,
+    target_role: str,
+    message_type: str,
+    payload: Optional[dict] = None,
+    latency_ms: Optional[int] = None,
+    parent_trace_id: Optional[str] = None,
+) -> None:
+    """Record a source→target agent call. Replaces the dropped Postgres inter_agent_trace table."""
+    import json as _json
+    _insert("inter_agent_trace", [{
+        "event_ts":        datetime.now(timezone.utc).isoformat(),
+        "tenant_id":       _tenant(),
+        "trace_id":        trace_id,
+        "parent_trace_id": parent_trace_id or "",
+        "source_role":     source_role,
+        "target_role":     target_role,
+        "message_type":    message_type,
+        "payload":         _json.dumps(payload or {})[:2000],
+        "latency_ms":      latency_ms or 0,
+    }])
+
+
+# ── tool_call_audit ───────────────────────────────────────────────────────────
+
+async def log_tool_call_audit(
+    trace_id: str,
+    role_category: str,
+    tool_name: str,
+    status: str,
+    duration_ms: Optional[int] = None,
+    input_hash: Optional[str] = None,
+    output_hash: Optional[str] = None,
+) -> None:
+    """Record a single tool invocation. Replaces the dropped Postgres tool_call_audit table.
+    status: 'SUCCESS' | 'ERROR' | 'TIMEOUT'
+    """
+    _insert("tool_call_audit", [{
+        "event_ts":      datetime.now(timezone.utc).isoformat(),
+        "tenant_id":     _tenant(),
+        "trace_id":      trace_id,
+        "role_category": role_category,
+        "tool_name":     tool_name,
+        "input_hash":    input_hash or "",
+        "output_hash":   output_hash or "",
+        "duration_ms":   duration_ms or 0,
+        "status":        status,
+    }])
+
+
 # ── Schema bootstrap ──────────────────────────────────────────────────────────
 
 def ensure_dataset_and_tables() -> None:
@@ -414,6 +474,36 @@ def ensure_dataset_and_tables() -> None:
             ],
             "partition": "cycle_ts",
             "description": "Feature build % per division per scan.",
+        },
+        "inter_agent_trace": {
+            "fields": [
+                ("event_ts",        "TIMESTAMP", "REQUIRED"),
+                ("tenant_id",       "STRING",    "REQUIRED"),
+                ("trace_id",        "STRING",    "NULLABLE"),
+                ("parent_trace_id", "STRING",    "NULLABLE"),
+                ("source_role",     "STRING",    "NULLABLE"),
+                ("target_role",     "STRING",    "NULLABLE"),
+                ("message_type",    "STRING",    "NULLABLE"),
+                ("payload",         "STRING",    "NULLABLE"),
+                ("latency_ms",      "INTEGER",   "NULLABLE"),
+            ],
+            "partition": "event_ts",
+            "description": "Source→target agent calls with payload and latency. Moved from Postgres.",
+        },
+        "tool_call_audit": {
+            "fields": [
+                ("event_ts",      "TIMESTAMP", "REQUIRED"),
+                ("tenant_id",     "STRING",    "REQUIRED"),
+                ("trace_id",      "STRING",    "NULLABLE"),
+                ("role_category", "STRING",    "NULLABLE"),
+                ("tool_name",     "STRING",    "NULLABLE"),
+                ("input_hash",    "STRING",    "NULLABLE"),
+                ("output_hash",   "STRING",    "NULLABLE"),
+                ("duration_ms",   "INTEGER",   "NULLABLE"),
+                ("status",        "STRING",    "NULLABLE"),
+            ],
+            "partition": "event_ts",
+            "description": "Per-tool invocation log (name, status, duration). Moved from Postgres.",
         },
     }
 

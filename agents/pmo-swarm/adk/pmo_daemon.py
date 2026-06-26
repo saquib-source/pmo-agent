@@ -52,10 +52,10 @@ from .shared import observability                             # Layer 8
 from .shared import config_registry                           # Layer 1
 from .shared.config_registry import (
     get_scan_interval, get_brief_hour, get_auto_comment,
-    get_jira_projects, get_tenant_id,
+    get_jira_projects,
 )
-from .shared.db import get_pool as get_db_pool               # Cloud SQL Postgres
-from .shared.analytics import (                              # BigQuery — primary data store
+from .shared.db import get_pool as get_db_pool               # Cloud SQL Postgres (operational tables only)
+from .shared.analytics import (                              # BigQuery — all agent-generated data
     ensure_dataset_and_tables,
     log_cycle_metrics,
     log_operating_brief,
@@ -159,38 +159,6 @@ async def _run_prompt(prompt: str, session_id: str) -> str:
                     full_response.append(part.text)
 
     return "\n".join(full_response)
-
-
-async def _save_brief_to_db(
-    brief_date,
-    brief_text: str,
-    elapsed_seconds: float,
-) -> None:
-    """Insert the Operating Brief into Cloud SQL Postgres daily_briefings table."""
-    try:
-        pool = await get_db_pool()
-        if pool is None:
-            return
-        tenant_id = get_tenant_id()
-        async with pool.acquire() as conn:
-            await conn.execute(
-                """
-                INSERT INTO daily_briefings
-                  (tenant_id, swarm_id, briefing_date, summary_text, generated_by_role)
-                VALUES ($1, $2, $3, $4, $5)
-                ON CONFLICT (tenant_id, briefing_date) DO UPDATE
-                  SET summary_text       = EXCLUDED.summary_text,
-                      generated_by_role  = EXCLUDED.generated_by_role
-                """,
-                tenant_id,
-                "pmo-swarm",
-                brief_date,
-                brief_text[:50000],
-                "PMO Orchestrator",
-            )
-        log.info(f"Brief saved to Cloud SQL Postgres daily_briefings — {brief_date}")
-    except Exception as e:
-        log.warning(f"daily_briefings DB write failed ({e}) — local file preserved")
 
 
 def _build_brief_prompt(mode: str = "full") -> str:
@@ -299,9 +267,6 @@ async def run_cycle(mode: str = "full") -> str:
         log.info("📈 Cycle metrics logged to BigQuery")
     except Exception as e:
         log.warning(f"BigQuery metrics write failed: {e}")
-
-    # Cloud SQL Postgres — backup: daily_briefings (kept for operational fast reads)
-    await _save_brief_to_db(start.date(), response, elapsed)
 
     log.info("=" * 80)
     log.info(f"✨ PMO SWARM CYCLE COMPLETE — {elapsed:.2f}s total")
