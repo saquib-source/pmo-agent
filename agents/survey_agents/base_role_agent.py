@@ -11,7 +11,6 @@ Responsibilities:
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import uuid
@@ -203,24 +202,18 @@ class BaseRoleAgent:
         duration_ms: int,
         status: str = "SUCCESS",
     ):
-        def _hash(data: Any) -> str:
-            return hashlib.sha256(json.dumps(data, sort_keys=True, default=str).encode()).hexdigest()[:16]
-
-        async with self._pool.acquire() as conn:
-            await conn.execute(
-                """
-                INSERT INTO tool_call_audit
-                  (trace_id, role_category, tool_name, input_hash, output_hash, duration_ms, status)
-                VALUES ($1, $2, $3, $4, $5, $6, $7)
-                """,
-                self.trace_id,
-                self.ROLE_CATEGORY,
-                tool_name,
-                _hash(input_data),
-                _hash(output_data),
-                duration_ms,
-                status,
-            )
+        # tool_call_audit moved from Postgres to BigQuery in migration
+        # 006_pmo_storage_routing.sql — all agent-generated analytics live in BigQuery.
+        from analytics import hash_payload, log_tool_call_audit
+        await log_tool_call_audit(
+            trace_id=self.trace_id,
+            role_category=self.ROLE_CATEGORY,
+            tool_name=tool_name,
+            status=status,
+            duration_ms=duration_ms,
+            input_hash=hash_payload(input_data),
+            output_hash=hash_payload(output_data),
+        )
 
     # ── Memory ────────────────────────────────────────────────────────────────
 

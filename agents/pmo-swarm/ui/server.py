@@ -23,7 +23,7 @@ import httpx
 from fastapi import FastAPI, Form
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 
-from adk.shared.governance import trust_ledger_read, trust_ledger_log
+from adk.shared.governance import trust_ledger_read, trust_ledger_read_db, trust_ledger_log
 from adk.shared import jira_client as jc
 
 logging.basicConfig(level=logging.INFO)
@@ -53,35 +53,44 @@ async def _db_pool():
 
 
 async def get_briefs(limit: int = 10):
-    pool = await _db_pool()
-    if pool is None:
+    """Read Operating Briefs from BigQuery operating_briefs (system of record).
+    PMO no longer writes to Postgres daily_briefings (Survey Agent owns that table)."""
+    from adk.shared.analytics import _client as _bq_client, _table, _tenant
+    bq = _bq_client()
+    if bq is None:
         return []
-    async with pool.acquire() as conn:
-        rows = await conn.fetch(
-            "SELECT briefing_date, summary_text, generated_by_role "
-            "FROM daily_briefings WHERE swarm_id='pmo-swarm' "
-            "ORDER BY briefing_date DESC LIMIT $1", limit)
-    return [dict(r) for r in rows]
+    try:
+        query = (
+            "SELECT cycle_ts AS briefing_date, brief_text AS summary_text, mode AS generated_by_role "
+            f"FROM `{_table('operating_briefs')}` "
+            "WHERE tenant_id = @tenant_id "
+            "ORDER BY cycle_ts DESC LIMIT @lim"
+        )
+        from google.cloud import bigquery
+        job = bq.query(query, job_config=bigquery.QueryJobConfig(query_parameters=[
+            bigquery.ScalarQueryParameter("tenant_id", "STRING", _tenant()),
+            bigquery.ScalarQueryParameter("lim", "INT64", limit),
+        ]))
+        return [dict(r) for r in job.result()]
+    except Exception as e:
+        log.warning(f"get_briefs BQ read failed ({e})")
+        return []
 
 
 async def get_agent_activity(limit: int = 400):
-    """Group recent Trust Ledger entries by agent (role_category) so the UI can
-    show what the orchestrator and each sub-agent have actually been doing."""
-    pool = await _db_pool()
+    """Group recent Trust Ledger entries by agent so the UI can show what the
+    orchestrator and each sub-agent have actually been doing.
+
+    Reads from BigQuery trust_events (system of record); falls back to local
+    JSONL inside trust_ledger_read_db when BigQuery is unavailable."""
     rows = []
-    if pool is None:
-        for e in trust_ledger_read(limit):
-            rows.append({"agent": e.get("agent_id", "?"), "event": e.get("type", ""),
-                         "detail": e.get("detail", ""), "ts": e.get("timestamp", "")})
-    else:
-        async with pool.acquire() as conn:
-            recs = await conn.fetch(
-                "SELECT role_category, event_type, evidence, created_at "
-                "FROM trust_ledger WHERE swarm_id='pmo-swarm' "
-                "ORDER BY created_at DESC LIMIT $1", limit)
-        for r in recs:
-            rows.append({"agent": r["role_category"], "event": r["event_type"],
-                         "detail": _ev_detail(r["evidence"]), "ts": str(r["created_at"])[:19]})
+    for e in await trust_ledger_read_db(limit):
+        rows.append({
+            "agent":  e.get("agent_id") or e.get("role_category") or "unknown",
+            "event":  e.get("event_type", ""),
+            "detail": _ev_detail(e.get("detail", "")),
+            "ts":     str(e.get("created_at", ""))[:19],
+        })
     by_agent = {}
     for r in rows:
         by_agent.setdefault(r["agent"] or "unknown", []).append(r)
@@ -89,17 +98,8 @@ async def get_agent_activity(limit: int = 400):
 
 
 async def get_ledger_db(limit: int = 50):
-    pool = await _db_pool()
-    if pool is None:
-        return [{"detail": e.get("detail", ""), "type": e.get("type"),
-                 "created_at": e.get("timestamp", ""), "agent_id": e.get("agent_id", "")}
-                for e in trust_ledger_read(limit)]
-    async with pool.acquire() as conn:
-        rows = await conn.fetch(
-            "SELECT role_category, event_type, decision_class, evidence, created_at "
-            "FROM trust_ledger WHERE swarm_id='pmo-swarm' "
-            "ORDER BY created_at DESC LIMIT $1", limit)
-    return [dict(r) for r in rows]
+    """Read the Trust Ledger from BigQuery trust_events (system of record)."""
+    return await trust_ledger_read_db(limit)
 
 
 import re
@@ -163,35 +163,45 @@ async def pending_actions_db(limit: int = 200):
              "ts": str(r["created_at"])[:19], "source": "action"} for r in rows]
 
 
+async def _gate_events(last_n: int = 300):
+    """ESCALATION_PENDING / ESCALATION_RESOLVED events from BigQuery trust_events
+    (system of record), oldest-first. Returns list of {event_type, detail, created_at}.
+    Falls back to local JSONL gate entries when BigQuery is unavailable."""
+    from adk.shared.analytics import _client as _bq_client, _table, _tenant
+    bq = _bq_client()
+    if bq is None:
+        # Local JSONL fallback — gate entries are logged as type 'gate'.
+        entries = trust_ledger_read(last_n)
+        return [{"event_type": "ESCALATION_PENDING", "detail": e.get("detail", ""),
+                 "created_at": e.get("timestamp", "")}
+                for e in entries if e.get("type") == "gate"]
+    try:
+        query = (
+            "SELECT event_type, detail, event_ts AS created_at "
+            f"FROM `{_table('trust_events')}` "
+            "WHERE tenant_id = @tenant_id AND swarm_id = 'pmo-swarm' "
+            "AND event_type IN ('ESCALATION_PENDING','ESCALATION_RESOLVED') "
+            "ORDER BY event_ts ASC LIMIT @lim"
+        )
+        from google.cloud import bigquery
+        job = bq.query(query, job_config=bigquery.QueryJobConfig(query_parameters=[
+            bigquery.ScalarQueryParameter("tenant_id", "STRING", _tenant()),
+            bigquery.ScalarQueryParameter("lim", "INT64", last_n),
+        ]))
+        return [dict(r) for r in job.result()]
+    except Exception as e:
+        log.warning(f"_gate_events BQ read failed ({e})")
+        return []
+
+
 async def pending_gates(last_n: int = 300):
     """Opened gates (ESCALATION_PENDING) with no later ESCALATION_RESOLVED for the
-    same ticket. Read from the shared Cloud SQL trust_ledger so the UI sees what
-    the Job wrote. Falls back to the local JSONL when DB is unavailable."""
-    pool = await _db_pool()
-    if pool is None:
-        entries = trust_ledger_read(last_n)
-        resolved = {e.get("detail", "").split("|", 1)[0].strip()
-                    for e in entries if e.get("type") in ("approval", "rejection")}
-        seen, out = set(), []
-        for e in entries:
-            if e.get("type") != "gate":
-                continue
-            d = e.get("detail", "")
-            if d in seen or _ticket_of(d) in resolved:
-                continue
-            seen.add(d)
-            out.append({"detail": d, "ticket": _ticket_of(d), "ts": e.get("timestamp", "")[:19]})
-        return out
-
-    async with pool.acquire() as conn:
-        rows = await conn.fetch(
-            "SELECT event_type, evidence, created_at FROM trust_ledger "
-            "WHERE swarm_id='pmo-swarm' AND event_type IN "
-            "('ESCALATION_PENDING','ESCALATION_RESOLVED') "
-            "ORDER BY created_at ASC LIMIT $1", last_n)
+    same ticket. Reads BigQuery trust_events (system of record) — the daemon and the
+    UI both write gate events there now that Postgres trust_ledger is Survey-Agent-only."""
+    rows = await _gate_events(last_n)
     resolved_tk, resolved_detail, opened, seen = set(), set(), [], set()
     for r in rows:
-        detail = _ev_detail(r["evidence"])
+        detail = _ev_detail(r["detail"])
         tk = _ticket_of(detail)
         if r["event_type"] == "ESCALATION_RESOLVED":
             if tk:
@@ -660,39 +670,19 @@ def _summarize(agent_id: str, acts: list) -> str:
 
 
 async def _record_resolution(ticket: str, detail: str) -> None:
-    """Write an ESCALATION_RESOLVED row so the gate stops showing as pending."""
-    pool = await _db_pool()
-    if pool is None:
-        return
-    from adk.shared.config_registry import get_tenant_id
-    async with pool.acquire() as conn:
-        await conn.execute(
-            "INSERT INTO trust_ledger (tenant_id, swarm_id, role_category, "
-            "event_type, decision_class, evidence) VALUES ($1,$2,$3,$4,$5,$6)",
-            get_tenant_id(), "pmo-swarm", "human",
-            "ESCALATION_RESOLVED", "HUMAN_GATE",
-            json.dumps({"detail": f"{detail} [{ticket}]"}))
+    """Write an ESCALATION_RESOLVED event to BigQuery trust_events (system of record)
+    so the gate stops showing as pending. pending_gates() reads from the same store."""
+    trust_ledger_log("ESCALATION_RESOLVED", f"{detail} [{ticket}]", agent_id="human")
 
 
 async def _record_gate_resolution(ticket: str, detail: str) -> None:
     """Resolve a specific open gate by storing its EXACT detail body, so it matches
     in pending_gates() even when there is no ticket key. Works for keyless gates."""
-    pool = await _db_pool()
-    if pool is None:
-        return
-    from adk.shared.config_registry import get_tenant_id
     # Store the gate's STRIPPED detail (no trailing [..]) plus a fresh [ticket] suffix.
     # pending_gates() compares _strip_resolution_suffix(open) against the stored
     # stripped body, so both sides normalize to the same string and the gate clears.
     stripped = _strip_resolution_suffix(detail)
-    body = f"{stripped} [{ticket}]"
-    async with pool.acquire() as conn:
-        await conn.execute(
-            "INSERT INTO trust_ledger (tenant_id, swarm_id, role_category, "
-            "event_type, decision_class, evidence) VALUES ($1,$2,$3,$4,$5,$6)",
-            get_tenant_id(), "pmo-swarm", "human",
-            "ESCALATION_RESOLVED", "HUMAN_GATE",
-            json.dumps({"detail": body}))
+    trust_ledger_log("ESCALATION_RESOLVED", f"{stripped} [{ticket}]", agent_id="human")
 
 
 def _flash(msg: str, kind: str = "ok") -> RedirectResponse:
