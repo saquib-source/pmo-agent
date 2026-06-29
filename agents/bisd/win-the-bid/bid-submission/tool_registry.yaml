@@ -1,0 +1,25 @@
+version: "1.0"
+artifact_type: tool_registry
+swarm: bisd
+agent: bid-submission
+tenant: basco
+status: STUB               # endpoints and schemas are TBD pending vendor access
+
+tools:
+  - name: gc_portals_and_forms
+    display: "GC portals and forms"
+    endpoint: null           # TBD — pending vendor access confirmation
+    auth: null               # TBD
+    schema: null             # TBD — define during build Phase 3
+    is_active: false
+
+  - name: trust_ledger_write
+    display: "Trust Ledger — append decision"
+    endpoint: "BigQuery: isrds_bisd.trust_events"
+    auth: service_account
+    schema:
+      agent_id: string
+      action: string
+      outcome: string
+      timestamp: string
+    is_active: false

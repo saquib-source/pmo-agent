@@ -1,0 +1,112 @@
+version: "1.0"
+artifact_type: agent_spec
+swarm: bisd
+tenant: basco
+generated_by: isrds-platform
+status: STUB               # set to ACTIVE only when is_active: true in Config Registry
+
+# ── Agent identity ─────────────────────────────────────────────────────────────
+name: publicized_project_aggregation_orchestrator
+display_name: "Publicized Project Aggregation"
+description: >
+  Orchestrator for the Publicized Project Aggregation swarm. Coordinates skill agents to produce: Public bid opportunities.
+
+sub_department: "find-the-jobs"
+business_object: "Public bid opportunities"
+agent_type: swarm
+posture: "Full"
+blocked_until: "None"
+implementation_status: "Established"
+
+# ── Runtime activation gate ───────────────────────────────────────────────────
+is_active: false           # NEVER set to true without explicit go-ahead
+activation_gate: MUST_APPROVE_BEFORE_LIVE
+
+model: null                # resolved at runtime via config_registry.resolve(tenant_id, agent_id)
+runtime: google-adk
+
+# ── Sub-agents (skill mesh) ───────────────────────────────────────────────────
+sub_agents:
+  - name: board_ingester_agent
+    role: "Board Ingester"
+    authority: DECIDE_AND_REPORT
+  - name: web_scraper_agent
+    role: "Web Scraper"
+    authority: DECIDE_AND_REPORT
+  - name: newsletter_parser_agent
+    role: "Newsletter Parser"
+    authority: DECIDE_AND_REPORT
+  - name: dedup_agent_agent
+    role: "De-Duplication Agent"
+    authority: DECIDE_AND_REPORT
+  - name: relevance_scorer_agent
+    role: "Relevance Scorer"
+    authority: DECIDE_AND_REPORT
+# ── Authority gradient ────────────────────────────────────────────────────────
+authority_gradient:
+  DECIDE_AND_REPORT:
+    applies_to: [all_reads, all_analysis, log_decision]
+  MUST_ESCALATE:
+    applies_to: [all_writes, all_external_actions, all_commitments]
+  DECIDE_SILENTLY:
+    applies_to: []          # none — everything is logged
+
+# ── Human gates ───────────────────────────────────────────────────────────────
+human_gates:
+    - Flag
+
+# ── Runtime layers ────────────────────────────────────────────────────────────
+runtime_layers:
+  1_config_registry:
+    status: stub
+    implementation: ../shared/config_registry.py
+    source: "Firestore system_config/bisd_agent_config"
+
+  2_agent_runtime:
+    status: stub
+    implementation: google-adk LlmAgent + Runner
+
+  3_tools:
+    status: stub
+    implementation: ../shared/tool_registry.py
+    artifact: tool_registry.yaml
+    integrations: "ConstructConnect (~$20K/yr), bid boards, scrapers, email"
+
+  4_memory:
+    status: stub
+    implementation: ../shared/memory.py
+    backend: Vertex AI Agent Engine
+    artifact: memory_schema.yaml
+
+  5_policy_governance:
+    status: stub
+    implementation: ../shared/governance.py + governance-rules.yaml
+
+  6_human_override:
+    status: stub
+    gate_types: [Flag]
+
+  7_workflow:
+    status: stub
+    artifact: workflow.yaml
+    trigger: "Continuous"
+
+  8_observability:
+    status: stub
+    implementation: ../shared/observability.py
+    destinations:
+      - Cloud Logging (logName: isrds/bisd/publicized-project-aggregation)
+      - Cloud Monitoring (custom.googleapis.com/isrds/bisd/publicized-project-aggregation/*)
+
+# ── Notes for build ───────────────────────────────────────────────────────────
+spec_notes: >
+  Broad capture plus light relevance filter. Deep door-count qualification in Bid Selection.
+
+# ── Portable artifacts ────────────────────────────────────────────────────────
+artifacts:
+  - agent_spec.yaml          # this file
+  - prompts/orchestrator.md
+  - tool_registry.yaml       # stub — endpoints TBD pending vendor access
+  - memory_schema.yaml       # stub — fields TBD pending requirements
+  - governance-rules.yaml
+  - workflow.yaml

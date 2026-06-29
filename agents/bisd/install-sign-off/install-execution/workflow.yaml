@@ -1,0 +1,51 @@
+version: "1.0"
+artifact_type: workflow_definition
+swarm: bisd
+agent: install-execution
+tenant: basco
+status: STUB               # implement during build Phase 3
+
+name: install_execution_workflow
+display_name: "Install Execution Workflow"
+description: >
+  Workflow for Install Execution.
+  Business object: Work order.
+  Posture: Full.
+
+trigger:
+  type: event
+  source: "Event: scheduled install"
+
+is_active: false           # workflow does not run until Config Registry is_active = true
+
+steps:
+      - id: dispatcher
+        agent: dispatcher_agent
+        action: "STUB — define during build Phase 3"
+        output: dispatcher_result
+      - id: parts_schedule_tracker
+        agent: parts_schedule_tracker_agent
+        action: "STUB — define during build Phase 3"
+        output: parts_schedule_tracker_result
+      - id: progress_tracker
+        agent: progress_tracker_agent
+        action: "STUB — define during build Phase 3"
+        output: progress_tracker_result
+      - id: synthesize
+        agent: install_execution_orchestrator
+        action: "Synthesize skill-agent outputs; produce final Work order"
+        gate: Approve
+        output: install_execution_result
+
+# ── Thresholds (override via Config Registry) ─────────────────────────────────
+thresholds:
+  sla_hours: null          # TBD — to be confirmed during build Phase 5
+  escalate_after_hours: null
+
+# ── Outputs ───────────────────────────────────────────────────────────────────
+outputs:
+  - trust_ledger:
+      action: log_decision
+      always: true
+  - cloud_logging:
+      log_name: isrds/bisd/install-execution

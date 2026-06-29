@@ -1,0 +1,39 @@
+version: "1.0"
+artifact_type: workflow_definition
+swarm: bisd
+agent: installer-payment
+tenant: basco
+status: STUB               # implement during build Phase 3
+
+name: installer_payment_workflow
+display_name: "Installer Payment Workflow"
+description: >
+  Workflow for Installer Payment.
+  Business object: Installer compensation.
+  Posture: Sign-off.
+
+trigger:
+  type: event
+  source: "Event: completion sign-off"
+
+is_active: false           # workflow does not run until Config Registry is_active = true
+
+steps:
+      - id: execute
+        agent: installer_payment_agent
+        action: "STUB — define during build Phase 3"
+        output: installer_payment_result
+
+
+# ── Thresholds (override via Config Registry) ─────────────────────────────────
+thresholds:
+  sla_hours: null          # TBD — to be confirmed during build Phase 5
+  escalate_after_hours: null
+
+# ── Outputs ───────────────────────────────────────────────────────────────────
+outputs:
+  - trust_ledger:
+      action: log_decision
+      always: true
+  - cloud_logging:
+      log_name: isrds/bisd/installer-payment

@@ -1,0 +1,55 @@
+version: "1.0"
+artifact_type: workflow_definition
+swarm: bisd
+agent: billing-collections
+tenant: basco
+status: STUB               # implement during build Phase 3
+
+name: billing_collections_workflow
+display_name: "Billing and Collections Workflow"
+description: >
+  Workflow for Billing and Collections.
+  Business object: Receivables and lien rights.
+  Posture: Sign-off.
+
+trigger:
+  type: event
+  source: "Event: sign-offs and statutory deadlines"
+
+is_active: false           # workflow does not run until Config Registry is_active = true
+
+steps:
+      - id: progress_invoicer
+        agent: progress_invoicer_agent
+        action: "STUB — define during build Phase 3"
+        output: progress_invoicer_result
+      - id: lien_filer
+        agent: lien_filer_agent
+        action: "STUB — define during build Phase 3"
+        output: lien_filer_result
+      - id: waiver_exchanger
+        agent: waiver_exchanger_agent
+        action: "STUB — define during build Phase 3"
+        output: waiver_exchanger_result
+      - id: collections_agent
+        agent: collections_agent_agent
+        action: "STUB — define during build Phase 3"
+        output: collections_agent_result
+      - id: synthesize
+        agent: billing_collections_orchestrator
+        action: "Synthesize skill-agent outputs; produce final Receivables and lien rights"
+        gate: Approve
+        output: billing_collections_result
+
+# ── Thresholds (override via Config Registry) ─────────────────────────────────
+thresholds:
+  sla_hours: null          # TBD — to be confirmed during build Phase 5
+  escalate_after_hours: null
+
+# ── Outputs ───────────────────────────────────────────────────────────────────
+outputs:
+  - trust_ledger:
+      action: log_decision
+      always: true
+  - cloud_logging:
+      log_name: isrds/bisd/billing-collections

@@ -1,0 +1,39 @@
+version: "1.0"
+artifact_type: workflow_definition
+swarm: bisd
+agent: insurance-compliance
+tenant: basco
+status: STUB               # implement during build Phase 3
+
+name: insurance_compliance_workflow
+display_name: "Insurance Compliance Workflow"
+description: >
+  Workflow for Insurance Compliance.
+  Business object: Insurance certificates.
+  Posture: Sign-off.
+
+trigger:
+  type: event
+  source: "Event: per job and per sub"
+
+is_active: false           # workflow does not run until Config Registry is_active = true
+
+steps:
+      - id: execute
+        agent: insurance_compliance_agent
+        action: "STUB — define during build Phase 3"
+        output: insurance_compliance_result
+
+
+# ── Thresholds (override via Config Registry) ─────────────────────────────────
+thresholds:
+  sla_hours: null          # TBD — to be confirmed during build Phase 5
+  escalate_after_hours: null
+
+# ── Outputs ───────────────────────────────────────────────────────────────────
+outputs:
+  - trust_ledger:
+      action: log_decision
+      always: true
+  - cloud_logging:
+      log_name: isrds/bisd/insurance-compliance

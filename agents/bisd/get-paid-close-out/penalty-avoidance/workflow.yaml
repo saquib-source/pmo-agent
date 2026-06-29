@@ -1,0 +1,39 @@
+version: "1.0"
+artifact_type: workflow_definition
+swarm: bisd
+agent: penalty-avoidance
+tenant: basco
+status: STUB               # implement during build Phase 3
+
+name: penalty_avoidance_workflow
+display_name: "Penalty Avoidance Workflow"
+description: >
+  Workflow for Penalty Avoidance.
+  Business object: Schedule risk.
+  Posture: Full.
+
+trigger:
+  type: continuous
+  source: "Continuous against contract schedule"
+
+is_active: false           # workflow does not run until Config Registry is_active = true
+
+steps:
+      - id: execute
+        agent: penalty_avoidance_agent
+        action: "STUB — define during build Phase 3"
+        output: penalty_avoidance_result
+
+
+# ── Thresholds (override via Config Registry) ─────────────────────────────────
+thresholds:
+  sla_hours: null          # TBD — to be confirmed during build Phase 5
+  escalate_after_hours: null
+
+# ── Outputs ───────────────────────────────────────────────────────────────────
+outputs:
+  - trust_ledger:
+      action: log_decision
+      always: true
+  - cloud_logging:
+      log_name: isrds/bisd/penalty-avoidance

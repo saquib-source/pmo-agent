@@ -1,0 +1,39 @@
+version: "1.0"
+artifact_type: workflow_definition
+swarm: bisd
+agent: cost-down-alternate
+tenant: basco
+status: STUB               # implement during build Phase 3
+
+name: cost_down_alternate_workflow
+display_name: "Cost-Down Alternate Workflow"
+description: >
+  Workflow for Cost-Down Alternate.
+  Business object: Compliant alternate.
+  Posture: Augment.
+
+trigger:
+  type: event
+  source: "Event: during pricing"
+
+is_active: false           # workflow does not run until Config Registry is_active = true
+
+steps:
+      - id: execute
+        agent: cost_down_alternate_agent
+        action: "STUB — define during build Phase 3"
+        output: cost_down_alternate_result
+
+
+# ── Thresholds (override via Config Registry) ─────────────────────────────────
+thresholds:
+  sla_hours: null          # TBD — to be confirmed during build Phase 5
+  escalate_after_hours: null
+
+# ── Outputs ───────────────────────────────────────────────────────────────────
+outputs:
+  - trust_ledger:
+      action: log_decision
+      always: true
+  - cloud_logging:
+      log_name: isrds/bisd/cost-down-alternate

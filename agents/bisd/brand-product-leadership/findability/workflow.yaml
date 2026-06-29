@@ -1,0 +1,51 @@
+version: "1.0"
+artifact_type: workflow_definition
+swarm: bisd
+agent: findability
+tenant: basco
+status: STUB               # implement during build Phase 3
+
+name: findability_workflow
+display_name: "Findability Workflow"
+description: >
+  Workflow for Findability.
+  Business object: Brand digital identity.
+  Posture: Augment.
+
+trigger:
+  type: continuous
+  source: "Continuous"
+
+is_active: false           # workflow does not run until Config Registry is_active = true
+
+steps:
+      - id: search_monitor
+        agent: search_monitor_agent
+        action: "STUB — define during build Phase 3"
+        output: search_monitor_result
+      - id: listings_manager
+        agent: listings_manager_agent
+        action: "STUB — define during build Phase 3"
+        output: listings_manager_result
+      - id: identity_correction
+        agent: identity_correction_agent
+        action: "STUB — define during build Phase 3"
+        output: identity_correction_result
+      - id: synthesize
+        agent: findability_orchestrator
+        action: "Synthesize skill-agent outputs; produce final Brand digital identity"
+        gate: Review
+        output: findability_result
+
+# ── Thresholds (override via Config Registry) ─────────────────────────────────
+thresholds:
+  sla_hours: null          # TBD — to be confirmed during build Phase 5
+  escalate_after_hours: null
+
+# ── Outputs ───────────────────────────────────────────────────────────────────
+outputs:
+  - trust_ledger:
+      action: log_decision
+      always: true
+  - cloud_logging:
+      log_name: isrds/bisd/findability
