@@ -1,0 +1,113 @@
+version: "1.0"
+artifact_type: agent_spec
+swarm: bisd
+tenant: basco
+generated_by: isrds-platform
+status: STUB               # set to ACTIVE only when is_active: true in Config Registry
+
+# ── Agent identity ─────────────────────────────────────────────────────────────
+name: bid_selection_orchestrator
+display_name: "Bid Selection (Go / No-Go)"
+description: >
+  Orchestrator for the Bid Selection (Go / No-Go) swarm. Coordinates skill agents to produce: Bid decision.
+
+sub_department: "win-the-bid"
+business_object: "Bid decision"
+agent_type: swarm
+posture: "Augment"
+blocked_until: "None"
+implementation_status: "Established"
+
+# ── Runtime activation gate ───────────────────────────────────────────────────
+is_active: false           # NEVER set to true without explicit go-ahead
+activation_gate: MUST_APPROVE_BEFORE_LIVE
+
+model: null                # resolved at runtime via config_registry.resolve(tenant_id, agent_id)
+runtime: google-adk
+
+# ── Sub-agents (skill mesh) ───────────────────────────────────────────────────
+sub_agents:
+  - name: rfp_parser_agent
+    role: "RFP Parser"
+    authority: MUST_ESCALATE
+  - name: opportunity_sizer_agent
+    role: "Door Opportunity Sizer"
+    authority: MUST_ESCALATE
+  - name: div10_scope_splitter_agent
+    role: "Division 10 Scope Splitter"
+    authority: MUST_ESCALATE
+  - name: substitution_detector_agent
+    role: "Substitution Clause Detector"
+    authority: MUST_ESCALATE
+  - name: recommendation_synthesizer_agent
+    role: "Recommendation Synthesizer"
+    authority: MUST_ESCALATE
+# ── Authority gradient ────────────────────────────────────────────────────────
+authority_gradient:
+  DECIDE_AND_REPORT:
+    applies_to: [all_reads, all_analysis, log_decision]
+  MUST_ESCALATE:
+    applies_to: [all_writes, all_external_actions, all_commitments]
+  DECIDE_SILENTLY:
+    applies_to: []          # none — everything is logged
+
+# ── Human gates ───────────────────────────────────────────────────────────────
+human_gates:
+    - Review
+    - Escalate
+
+# ── Runtime layers ────────────────────────────────────────────────────────────
+runtime_layers:
+  1_config_registry:
+    status: stub
+    implementation: ../shared/config_registry.py
+    source: "Firestore system_config/bisd_agent_config"
+
+  2_agent_runtime:
+    status: stub
+    implementation: google-adk LlmAgent + Runner
+
+  3_tools:
+    status: stub
+    implementation: ../shared/tool_registry.py
+    artifact: tool_registry.yaml
+    integrations: "Document and plan parsing"
+
+  4_memory:
+    status: stub
+    implementation: ../shared/memory.py
+    backend: Vertex AI Agent Engine
+    artifact: memory_schema.yaml
+
+  5_policy_governance:
+    status: stub
+    implementation: ../shared/governance.py + governance-rules.yaml
+
+  6_human_override:
+    status: stub
+    gate_types: [Review, Escalate]
+
+  7_workflow:
+    status: stub
+    artifact: workflow.yaml
+    trigger: "Event: new qualified RFP"
+
+  8_observability:
+    status: stub
+    implementation: ../shared/observability.py
+    destinations:
+      - Cloud Logging (logName: isrds/bisd/bid-selection)
+      - Cloud Monitoring (custom.googleapis.com/isrds/bisd/bid-selection/*)
+
+# ── Notes for build ───────────────────────────────────────────────────────────
+spec_notes: >
+  First RFP read. Substitution detection lives here; the pursuit is Substitution Approval next.
+
+# ── Portable artifacts ────────────────────────────────────────────────────────
+artifacts:
+  - agent_spec.yaml          # this file
+  - prompts/orchestrator.md
+  - tool_registry.yaml       # stub — endpoints TBD pending vendor access
+  - memory_schema.yaml       # stub — fields TBD pending requirements
+  - governance-rules.yaml
+  - workflow.yaml

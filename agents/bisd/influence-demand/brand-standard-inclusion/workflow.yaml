@@ -1,0 +1,39 @@
+version: "1.0"
+artifact_type: workflow_definition
+swarm: bisd
+agent: brand-standard-inclusion
+tenant: basco
+status: STUB               # implement during build Phase 3
+
+name: brand_standard_inclusion_workflow
+display_name: "Brand-Standard Inclusion Workflow"
+description: >
+  Workflow for Brand-Standard Inclusion.
+  Business object: Brand or national standard.
+  Posture: Augment.
+
+trigger:
+  type: continuous
+  source: "Continuous"
+
+is_active: false           # workflow does not run until Config Registry is_active = true
+
+steps:
+      - id: execute
+        agent: brand_standard_inclusion_agent
+        action: "STUB — define during build Phase 3"
+        output: brand_standard_inclusion_result
+
+
+# ── Thresholds (override via Config Registry) ─────────────────────────────────
+thresholds:
+  sla_hours: null          # TBD — to be confirmed during build Phase 5
+  escalate_after_hours: null
+
+# ── Outputs ───────────────────────────────────────────────────────────────────
+outputs:
+  - trust_ledger:
+      action: log_decision
+      always: true
+  - cloud_logging:
+      log_name: isrds/bisd/brand-standard-inclusion

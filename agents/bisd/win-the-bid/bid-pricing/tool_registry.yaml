@@ -1,0 +1,37 @@
+version: "1.0"
+artifact_type: tool_registry
+swarm: bisd
+agent: bid-pricing
+tenant: basco
+status: STUB               # endpoints and schemas are TBD pending vendor access
+
+tools:
+  - name: plan_reading
+    display: "Plan reading"
+    endpoint: null           # TBD — pending vendor access confirmation
+    auth: null               # TBD
+    schema: null             # TBD — define during build Phase 3
+    is_active: false
+  - name: price_book
+    display: "price book"
+    endpoint: null           # TBD — pending vendor access confirmation
+    auth: null               # TBD
+    schema: null             # TBD — define during build Phase 3
+    is_active: false
+  - name: tariff_and_freight_data
+    display: "tariff and freight data"
+    endpoint: null           # TBD — pending vendor access confirmation
+    auth: null               # TBD
+    schema: null             # TBD — define during build Phase 3
+    is_active: false
+
+  - name: trust_ledger_write
+    display: "Trust Ledger — append decision"
+    endpoint: "BigQuery: isrds_bisd.trust_events"
+    auth: service_account
+    schema:
+      agent_id: string
+      action: string
+      outcome: string
+      timestamp: string
+    is_active: false

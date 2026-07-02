@@ -1,0 +1,59 @@
+version: "1.0"
+artifact_type: workflow_definition
+swarm: bisd
+agent: order-realization
+tenant: basco
+status: STUB               # implement during build Phase 3
+
+name: order_realization_workflow
+display_name: "Order Realization Workflow"
+description: >
+  Workflow for Order Realization.
+  Business object: Internal order.
+  Posture: Augment.
+
+trigger:
+  type: event
+  source: "Event: won bid"
+
+is_active: false           # workflow does not run until Config Registry is_active = true
+
+steps:
+      - id: cost_accounting_handoff
+        agent: cost_accounting_handoff_agent
+        action: "STUB — define during build Phase 3"
+        output: cost_accounting_handoff_result
+      - id: purchasing_orchestrator
+        agent: purchasing_orchestrator_agent
+        action: "STUB — define during build Phase 3"
+        output: purchasing_orchestrator_result
+      - id: production_scheduler
+        agent: production_scheduler_agent
+        action: "STUB — define during build Phase 3"
+        output: production_scheduler_result
+      - id: warehouse_coordinator
+        agent: warehouse_coordinator_agent
+        action: "STUB — define during build Phase 3"
+        output: warehouse_coordinator_result
+      - id: operations_router
+        agent: operations_router_agent
+        action: "STUB — define during build Phase 3"
+        output: operations_router_result
+      - id: synthesize
+        agent: order_realization_orchestrator
+        action: "Synthesize skill-agent outputs; produce final Internal order"
+        gate: Approve
+        output: order_realization_result
+
+# ── Thresholds (override via Config Registry) ─────────────────────────────────
+thresholds:
+  sla_hours: null          # TBD — to be confirmed during build Phase 5
+  escalate_after_hours: null
+
+# ── Outputs ───────────────────────────────────────────────────────────────────
+outputs:
+  - trust_ledger:
+      action: log_decision
+      always: true
+  - cloud_logging:
+      log_name: isrds/bisd/order-realization

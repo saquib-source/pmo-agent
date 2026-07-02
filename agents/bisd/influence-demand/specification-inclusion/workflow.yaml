@@ -1,0 +1,39 @@
+version: "1.0"
+artifact_type: workflow_definition
+swarm: bisd
+agent: specification-inclusion
+tenant: basco
+status: STUB               # implement during build Phase 3
+
+name: specification_inclusion_workflow
+display_name: "Specification Inclusion Workflow"
+description: >
+  Workflow for Specification Inclusion.
+  Business object: Project specification.
+  Posture: Sign-off.
+
+trigger:
+  type: event
+  source: "Event: Early Project Discovery finds an in-design project"
+
+is_active: false           # workflow does not run until Config Registry is_active = true
+
+steps:
+      - id: execute
+        agent: specification_inclusion_agent
+        action: "STUB — define during build Phase 3"
+        output: specification_inclusion_result
+
+
+# ── Thresholds (override via Config Registry) ─────────────────────────────────
+thresholds:
+  sla_hours: null          # TBD — to be confirmed during build Phase 5
+  escalate_after_hours: null
+
+# ── Outputs ───────────────────────────────────────────────────────────────────
+outputs:
+  - trust_ledger:
+      action: log_decision
+      always: true
+  - cloud_logging:
+      log_name: isrds/bisd/specification-inclusion

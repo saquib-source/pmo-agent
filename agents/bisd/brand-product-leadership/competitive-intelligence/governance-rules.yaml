@@ -1,0 +1,41 @@
+version: "1.0"
+artifact_type: governance_rules
+swarm: bisd
+agent: competitive-intelligence
+tenant: basco
+status: STUB               # finalize during build Phase 5
+description: >
+  Authority gradient rules for Competitive Intelligence.
+  Posture: Full (recon).
+  Business object: Competitor product and spec landscape.
+
+rules:
+  - action: read_data
+    decision: allow
+    rationale: "Read-only access — no side-effects."
+
+  - action: analyze
+    decision: allow
+    rationale: "Analysis only — no external action."
+
+  - action: log_decision
+    decision: allow
+    rationale: "Append-only Trust Ledger write — cannot modify existing records." 
+  - action: flag_anomaly
+    decision: gate
+    gate: Flag
+    hard_stop: false
+    timeout_hours: 48
+    rationale: "Flag for human awareness; does not block agent." 
+  - action: override
+    decision: gate
+    gate: Override
+    hard_stop: true
+    timeout: null
+    rationale: "Override reverses an agent decision. Hard gate, no timeout." 
+  - action: kill
+    decision: gate
+    gate: Kill
+    hard_stop: true
+    timeout: null
+    rationale: "Kill terminates agent operation entirely. Hard gate, no timeout." 

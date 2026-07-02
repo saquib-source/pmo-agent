@@ -1,0 +1,51 @@
+version: "1.0"
+artifact_type: workflow_definition
+swarm: bisd
+agent: installer-coverage
+tenant: basco
+status: STUB               # implement during build Phase 3
+
+name: installer_coverage_workflow
+display_name: "Installer Coverage Workflow"
+description: >
+  Workflow for Installer Coverage.
+  Business object: Service Provider network.
+  Posture: Augment.
+
+trigger:
+  type: continuous
+  source: "Continuous"
+
+is_active: false           # workflow does not run until Config Registry is_active = true
+
+steps:
+      - id: recruiter
+        agent: recruiter_agent
+        action: "STUB — define during build Phase 3"
+        output: recruiter_result
+      - id: vetter
+        agent: vetter_agent
+        action: "STUB — define during build Phase 3"
+        output: vetter_result
+      - id: coverage_mapper
+        agent: coverage_mapper_agent
+        action: "STUB — define during build Phase 3"
+        output: coverage_mapper_result
+      - id: synthesize
+        agent: installer_coverage_orchestrator
+        action: "Synthesize skill-agent outputs; produce final Service Provider network"
+        gate: Review
+        output: installer_coverage_result
+
+# ── Thresholds (override via Config Registry) ─────────────────────────────────
+thresholds:
+  sla_hours: null          # TBD — to be confirmed during build Phase 5
+  escalate_after_hours: null
+
+# ── Outputs ───────────────────────────────────────────────────────────────────
+outputs:
+  - trust_ledger:
+      action: log_decision
+      always: true
+  - cloud_logging:
+      log_name: isrds/bisd/installer-coverage

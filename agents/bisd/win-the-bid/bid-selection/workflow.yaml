@@ -1,0 +1,59 @@
+version: "1.0"
+artifact_type: workflow_definition
+swarm: bisd
+agent: bid-selection
+tenant: basco
+status: STUB               # implement during build Phase 3
+
+name: bid_selection_workflow
+display_name: "Bid Selection (Go / No-Go) Workflow"
+description: >
+  Workflow for Bid Selection (Go / No-Go).
+  Business object: Bid decision.
+  Posture: Augment.
+
+trigger:
+  type: event
+  source: "Event: new qualified RFP"
+
+is_active: false           # workflow does not run until Config Registry is_active = true
+
+steps:
+      - id: rfp_parser
+        agent: rfp_parser_agent
+        action: "STUB — define during build Phase 3"
+        output: rfp_parser_result
+      - id: opportunity_sizer
+        agent: opportunity_sizer_agent
+        action: "STUB — define during build Phase 3"
+        output: opportunity_sizer_result
+      - id: div10_scope_splitter
+        agent: div10_scope_splitter_agent
+        action: "STUB — define during build Phase 3"
+        output: div10_scope_splitter_result
+      - id: substitution_detector
+        agent: substitution_detector_agent
+        action: "STUB — define during build Phase 3"
+        output: substitution_detector_result
+      - id: recommendation_synthesizer
+        agent: recommendation_synthesizer_agent
+        action: "STUB — define during build Phase 3"
+        output: recommendation_synthesizer_result
+      - id: synthesize
+        agent: bid_selection_orchestrator
+        action: "Synthesize skill-agent outputs; produce final Bid decision"
+        gate: Review
+        output: bid_selection_result
+
+# ── Thresholds (override via Config Registry) ─────────────────────────────────
+thresholds:
+  sla_hours: null          # TBD — to be confirmed during build Phase 5
+  escalate_after_hours: null
+
+# ── Outputs ───────────────────────────────────────────────────────────────────
+outputs:
+  - trust_ledger:
+      action: log_decision
+      always: true
+  - cloud_logging:
+      log_name: isrds/bisd/bid-selection

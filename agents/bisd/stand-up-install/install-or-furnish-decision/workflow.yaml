@@ -1,0 +1,39 @@
+version: "1.0"
+artifact_type: workflow_definition
+swarm: bisd
+agent: install-or-furnish-decision
+tenant: basco
+status: STUB               # implement during build Phase 3
+
+name: install_or_furnish_decision_workflow
+display_name: "Install-or-Furnish Decision Workflow"
+description: >
+  Workflow for Install-or-Furnish Decision.
+  Business object: Fulfillment mode.
+  Posture: Full.
+
+trigger:
+  type: event
+  source: "Event: per job"
+
+is_active: false           # workflow does not run until Config Registry is_active = true
+
+steps:
+      - id: execute
+        agent: install_or_furnish_decision_agent
+        action: "STUB — define during build Phase 3"
+        output: install_or_furnish_decision_result
+
+
+# ── Thresholds (override via Config Registry) ─────────────────────────────────
+thresholds:
+  sla_hours: null          # TBD — to be confirmed during build Phase 5
+  escalate_after_hours: null
+
+# ── Outputs ───────────────────────────────────────────────────────────────────
+outputs:
+  - trust_ledger:
+      action: log_decision
+      always: true
+  - cloud_logging:
+      log_name: isrds/bisd/install-or-furnish-decision

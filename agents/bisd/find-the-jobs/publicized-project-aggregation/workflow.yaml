@@ -1,0 +1,59 @@
+version: "1.0"
+artifact_type: workflow_definition
+swarm: bisd
+agent: publicized-project-aggregation
+tenant: basco
+status: STUB               # implement during build Phase 3
+
+name: publicized_project_aggregation_workflow
+display_name: "Publicized Project Aggregation Workflow"
+description: >
+  Workflow for Publicized Project Aggregation.
+  Business object: Public bid opportunities.
+  Posture: Full.
+
+trigger:
+  type: continuous
+  source: "Continuous"
+
+is_active: false           # workflow does not run until Config Registry is_active = true
+
+steps:
+      - id: board_ingester
+        agent: board_ingester_agent
+        action: "STUB — define during build Phase 3"
+        output: board_ingester_result
+      - id: web_scraper
+        agent: web_scraper_agent
+        action: "STUB — define during build Phase 3"
+        output: web_scraper_result
+      - id: newsletter_parser
+        agent: newsletter_parser_agent
+        action: "STUB — define during build Phase 3"
+        output: newsletter_parser_result
+      - id: dedup_agent
+        agent: dedup_agent_agent
+        action: "STUB — define during build Phase 3"
+        output: dedup_agent_result
+      - id: relevance_scorer
+        agent: relevance_scorer_agent
+        action: "STUB — define during build Phase 3"
+        output: relevance_scorer_result
+      - id: synthesize
+        agent: publicized_project_aggregation_orchestrator
+        action: "Synthesize skill-agent outputs; produce final Public bid opportunities"
+        gate: Flag
+        output: publicized_project_aggregation_result
+
+# ── Thresholds (override via Config Registry) ─────────────────────────────────
+thresholds:
+  sla_hours: null          # TBD — to be confirmed during build Phase 5
+  escalate_after_hours: null
+
+# ── Outputs ───────────────────────────────────────────────────────────────────
+outputs:
+  - trust_ledger:
+      action: log_decision
+      always: true
+  - cloud_logging:
+      log_name: isrds/bisd/publicized-project-aggregation

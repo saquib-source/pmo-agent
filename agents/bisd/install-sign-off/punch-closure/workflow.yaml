@@ -1,0 +1,39 @@
+version: "1.0"
+artifact_type: workflow_definition
+swarm: bisd
+agent: punch-closure
+tenant: basco
+status: STUB               # implement during build Phase 3
+
+name: punch_closure_workflow
+display_name: "Punch Closure Workflow"
+description: >
+  Workflow for Punch Closure.
+  Business object: Punch list.
+  Posture: Sign-off.
+
+trigger:
+  type: event
+  source: "Event: post-install inspection"
+
+is_active: false           # workflow does not run until Config Registry is_active = true
+
+steps:
+      - id: execute
+        agent: punch_closure_agent
+        action: "STUB — define during build Phase 3"
+        output: punch_closure_result
+
+
+# ── Thresholds (override via Config Registry) ─────────────────────────────────
+thresholds:
+  sla_hours: null          # TBD — to be confirmed during build Phase 5
+  escalate_after_hours: null
+
+# ── Outputs ───────────────────────────────────────────────────────────────────
+outputs:
+  - trust_ledger:
+      action: log_decision
+      always: true
+  - cloud_logging:
+      log_name: isrds/bisd/punch-closure
