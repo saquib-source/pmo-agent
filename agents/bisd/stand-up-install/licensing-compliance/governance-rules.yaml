@@ -1,0 +1,35 @@
+version: "1.0"
+artifact_type: governance_rules
+swarm: bisd
+agent: licensing-compliance
+tenant: basco
+status: STUB               # finalize during build Phase 5
+description: >
+  Authority gradient rules for Licensing Compliance.
+  Posture: Sign-off.
+  Business object: Licenses and permits.
+
+rules:
+  - action: read_data
+    decision: allow
+    rationale: "Read-only access — no side-effects."
+
+  - action: analyze
+    decision: allow
+    rationale: "Analysis only — no external action."
+
+  - action: log_decision
+    decision: allow
+    rationale: "Append-only Trust Ledger write — cannot modify existing records." 
+  - action: draft_output
+    decision: gate
+    gate: Review
+    hard_stop: false
+    timeout_hours: 24
+    rationale: "Output must be reviewed before delivery." 
+  - action: escalate
+    decision: gate
+    gate: Escalate
+    hard_stop: false
+    timeout_hours: 4
+    rationale: "Escalations are sent to leadership and must reflect considered judgment." 

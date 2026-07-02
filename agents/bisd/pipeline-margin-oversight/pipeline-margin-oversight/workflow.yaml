@@ -1,0 +1,55 @@
+version: "1.0"
+artifact_type: workflow_definition
+swarm: bisd
+agent: pipeline-margin-oversight
+tenant: basco
+status: STUB               # implement during build Phase 3
+
+name: pipeline_margin_oversight_workflow
+display_name: "Pipeline and Margin Oversight Workflow"
+description: >
+  Workflow for Pipeline and Margin Oversight.
+  Business object: Commercial performance.
+  Posture: Full.
+
+trigger:
+  type: continuous
+  source: "Continuous, fed across the flow"
+
+is_active: false           # workflow does not run until Config Registry is_active = true
+
+steps:
+      - id: pipeline_aggregator
+        agent: pipeline_aggregator_agent
+        action: "STUB — define during build Phase 3"
+        output: pipeline_aggregator_result
+      - id: win_loss_analyzer
+        agent: win_loss_analyzer_agent
+        action: "STUB — define during build Phase 3"
+        output: win_loss_analyzer_result
+      - id: billed_collected_tracker
+        agent: billed_collected_tracker_agent
+        action: "STUB — define during build Phase 3"
+        output: billed_collected_tracker_result
+      - id: margin_by_mix_calculator
+        agent: margin_by_mix_calculator_agent
+        action: "STUB — define during build Phase 3"
+        output: margin_by_mix_calculator_result
+      - id: synthesize
+        agent: pipeline_margin_oversight_orchestrator
+        action: "Synthesize skill-agent outputs; produce final Commercial performance"
+        gate: Flag
+        output: pipeline_margin_oversight_result
+
+# ── Thresholds (override via Config Registry) ─────────────────────────────────
+thresholds:
+  sla_hours: null          # TBD — to be confirmed during build Phase 5
+  escalate_after_hours: null
+
+# ── Outputs ───────────────────────────────────────────────────────────────────
+outputs:
+  - trust_ledger:
+      action: log_decision
+      always: true
+  - cloud_logging:
+      log_name: isrds/bisd/pipeline-margin-oversight

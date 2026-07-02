@@ -1,0 +1,47 @@
+version: "1.0"
+artifact_type: workflow_definition
+swarm: bisd
+agent: equivalence-proof
+tenant: basco
+status: STUB               # implement during build Phase 3
+
+name: equivalence_proof_workflow
+display_name: "Equivalence Proof Workflow"
+description: >
+  Workflow for Equivalence Proof.
+  Business object: Comparative evidence.
+  Posture: Augment.
+
+trigger:
+  type: event
+  source: "Substitution opportunity"
+
+is_active: false           # workflow does not run until Config Registry is_active = true
+
+steps:
+      - id: test_data_tracker
+        agent: test_data_tracker_agent
+        action: "STUB — define during build Phase 3"
+        output: test_data_tracker_result
+      - id: evidence_packager
+        agent: evidence_packager_agent
+        action: "STUB — define during build Phase 3"
+        output: evidence_packager_result
+      - id: synthesize
+        agent: equivalence_proof_orchestrator
+        action: "Synthesize skill-agent outputs; produce final Comparative evidence"
+        gate: Review
+        output: equivalence_proof_result
+
+# ── Thresholds (override via Config Registry) ─────────────────────────────────
+thresholds:
+  sla_hours: null          # TBD — to be confirmed during build Phase 5
+  escalate_after_hours: null
+
+# ── Outputs ───────────────────────────────────────────────────────────────────
+outputs:
+  - trust_ledger:
+      action: log_decision
+      always: true
+  - cloud_logging:
+      log_name: isrds/bisd/equivalence-proof

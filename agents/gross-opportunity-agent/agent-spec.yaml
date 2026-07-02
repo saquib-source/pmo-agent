@@ -1,0 +1,69 @@
+agent_id: gross-opportunity-agent
+tenant_id: basco
+name: Gross Opportunity Agent
+display_name: "GOA — Gross Opportunity"
+version: "1.0.0"
+species: computational_ingestion_and_discovery
+
+description: >
+  Ingests commercial construction opportunities from multiple sources, normalizes them to
+  a canonical schema, removes duplicates, applies a coarse relevance gate, and serves a
+  ranked human review list. Never bids, never contacts anyone. Pillar 1 only.
+
+runtime:
+  framework: google_adk
+  deployment: vertex_ai_agent_engine   # Calibrated — Manmeet's runtime decision
+  python_version: "3.11"
+  engine: config_registry              # All roles resolved at runtime via config/engines.json
+
+# Six internal functions — this is a single agent, not a multi-agent swarm
+functions:
+  - id: connector_adapters
+    description: Pull raw records from one source per adapter. Deterministic.
+    config_registry_role: null         # No model — deterministic only
+  - id: normalizer
+    description: Map raw record to CanonicalOpportunity. Extraction model for messy fields.
+    config_registry_role: normalizer_extraction
+  - id: dedup_engine
+    description: Collapse duplicate projects. Deterministic keys, fuzzy match, embeddings, model for ambiguous.
+    config_registry_role: dedup_ambiguous_merge
+  - id: coarse_gate
+    description: Apply initial_screening rules and scope. Classifier for the ambiguous middle. Recall-first.
+    config_registry_role: gate_classifier
+  - id: source_discovery_scout
+    description: Find new sources. Proposes for human APPROVE — never connects autonomously.
+    config_registry_role: scout_reasoning
+  - id: liveness_watchdog
+    description: Treat source silence as failure. Route non-opportunity records out. Deterministic.
+    config_registry_role: null
+
+memory:
+  surface: vertex_ai_agent_engine
+  usage: light   # Scout inter-run context and watermark supplement only
+
+data_stores:
+  lake: bigquery
+  serving: cloud_sql_postgresql_15
+  activity_stream: firestore
+  agent_memory: vertex_ai_agent_engine
+
+autonomy:
+  ingestion: full           # Agent decides and acts — no human gate
+  dedup: full
+  coarse_gate: full
+  scout_connect_source: human_approve   # APPROVE gate required before enabled = true
+  bid: not_in_scope
+  contact_anyone: not_in_scope
+
+escalation:
+  source_silent: warn then escalate_to_human
+  gate_pass_rate_drift: warn
+  dedup_collision_rate_spike: warn
+
+gaps:
+  - GCP project id and region
+  - SAM.gov NAICS codes and keyword set for scope
+  - Verified source registry and confirmed per-source costs
+  - Real recall, duplication, and cost targets
+  - Critical-state thresholds
+  - Authoritative deep criteria (owned by Derek and Shawn)

@@ -1,0 +1,55 @@
+version: "1.0"
+artifact_type: workflow_definition
+swarm: bisd
+agent: bid-pricing
+tenant: basco
+status: STUB               # implement during build Phase 3
+
+name: bid_pricing_workflow
+display_name: "Bid Pricing Workflow"
+description: >
+  Workflow for Bid Pricing.
+  Business object: Bid price.
+  Posture: Augment.
+
+trigger:
+  type: event
+  source: "Event: go decision"
+
+is_active: false           # workflow does not run until Config Registry is_active = true
+
+steps:
+      - id: takeoff_counter
+        agent: takeoff_counter_agent
+        action: "STUB — define during build Phase 3"
+        output: takeoff_counter_result
+      - id: product_selector
+        agent: product_selector_agent
+        action: "STUB — define during build Phase 3"
+        output: product_selector_result
+      - id: freight_tariff_pricer
+        agent: freight_tariff_pricer_agent
+        action: "STUB — define during build Phase 3"
+        output: freight_tariff_pricer_result
+      - id: margin_calculator
+        agent: margin_calculator_agent
+        action: "STUB — define during build Phase 3"
+        output: margin_calculator_result
+      - id: synthesize
+        agent: bid_pricing_orchestrator
+        action: "Synthesize skill-agent outputs; produce final Bid price"
+        gate: Review
+        output: bid_pricing_result
+
+# ── Thresholds (override via Config Registry) ─────────────────────────────────
+thresholds:
+  sla_hours: null          # TBD — to be confirmed during build Phase 5
+  escalate_after_hours: null
+
+# ── Outputs ───────────────────────────────────────────────────────────────────
+outputs:
+  - trust_ledger:
+      action: log_decision
+      always: true
+  - cloud_logging:
+      log_name: isrds/bisd/bid-pricing

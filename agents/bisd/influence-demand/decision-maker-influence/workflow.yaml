@@ -1,0 +1,51 @@
+version: "1.0"
+artifact_type: workflow_definition
+swarm: bisd
+agent: decision-maker-influence
+tenant: basco
+status: STUB               # implement during build Phase 3
+
+name: decision_maker_influence_workflow
+display_name: "Decision-Maker Influence Workflow"
+description: >
+  Workflow for Decision-Maker Influence.
+  Business object: Specifier relationships.
+  Posture: Sign-off.
+
+trigger:
+  type: continuous
+  source: "Continuous plus project-triggered"
+
+is_active: false           # workflow does not run until Config Registry is_active = true
+
+steps:
+      - id: media_placement
+        agent: media_placement_agent
+        action: "STUB — define during build Phase 3"
+        output: media_placement_result
+      - id: professional_presence
+        agent: professional_presence_agent
+        action: "STUB — define during build Phase 3"
+        output: professional_presence_result
+      - id: direct_contact_sequencer
+        agent: direct_contact_sequencer_agent
+        action: "STUB — define during build Phase 3"
+        output: direct_contact_sequencer_result
+      - id: synthesize
+        agent: decision_maker_influence_orchestrator
+        action: "Synthesize skill-agent outputs; produce final Specifier relationships"
+        gate: Approve
+        output: decision_maker_influence_result
+
+# ── Thresholds (override via Config Registry) ─────────────────────────────────
+thresholds:
+  sla_hours: null          # TBD — to be confirmed during build Phase 5
+  escalate_after_hours: null
+
+# ── Outputs ───────────────────────────────────────────────────────────────────
+outputs:
+  - trust_ledger:
+      action: log_decision
+      always: true
+  - cloud_logging:
+      log_name: isrds/bisd/decision-maker-influence

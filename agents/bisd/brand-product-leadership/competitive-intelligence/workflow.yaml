@@ -1,0 +1,59 @@
+version: "1.0"
+artifact_type: workflow_definition
+swarm: bisd
+agent: competitive-intelligence
+tenant: basco
+status: STUB               # implement during build Phase 3
+
+name: competitive_intelligence_workflow
+display_name: "Competitive Intelligence Workflow"
+description: >
+  Workflow for Competitive Intelligence.
+  Business object: Competitor product and spec landscape.
+  Posture: Full (recon).
+
+trigger:
+  type: continuous
+  source: "Continuous"
+
+is_active: false           # workflow does not run until Config Registry is_active = true
+
+steps:
+      - id: product_monitor
+        agent: product_monitor_agent
+        action: "STUB — define during build Phase 3"
+        output: product_monitor_result
+      - id: patent_monitor
+        agent: patent_monitor_agent
+        action: "STUB — define during build Phase 3"
+        output: patent_monitor_result
+      - id: claims_monitor
+        agent: claims_monitor_agent
+        action: "STUB — define during build Phase 3"
+        output: claims_monitor_result
+      - id: spec_language_monitor
+        agent: spec_language_monitor_agent
+        action: "STUB — define during build Phase 3"
+        output: spec_language_monitor_result
+      - id: gap_analysis_synthesizer
+        agent: gap_analysis_synthesizer_agent
+        action: "STUB — define during build Phase 3"
+        output: gap_analysis_synthesizer_result
+      - id: synthesize
+        agent: competitive_intelligence_orchestrator
+        action: "Synthesize skill-agent outputs; produce final Competitor product and spec landscape"
+        gate: Flag
+        output: competitive_intelligence_result
+
+# ── Thresholds (override via Config Registry) ─────────────────────────────────
+thresholds:
+  sla_hours: null          # TBD — to be confirmed during build Phase 5
+  escalate_after_hours: null
+
+# ── Outputs ───────────────────────────────────────────────────────────────────
+outputs:
+  - trust_ledger:
+      action: log_decision
+      always: true
+  - cloud_logging:
+      log_name: isrds/bisd/competitive-intelligence

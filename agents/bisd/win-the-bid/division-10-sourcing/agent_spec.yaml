@@ -1,0 +1,107 @@
+version: "1.0"
+artifact_type: agent_spec
+swarm: bisd
+tenant: basco
+generated_by: isrds-platform
+status: STUB               # set to ACTIVE only when is_active: true in Config Registry
+
+# ── Agent identity ─────────────────────────────────────────────────────────────
+name: division_10_sourcing_orchestrator
+display_name: "Division 10 Sourcing"
+description: >
+  Orchestrator for the Division 10 Sourcing swarm. Coordinates skill agents to produce: Division 10 scope.
+
+sub_department: "win-the-bid"
+business_object: "Division 10 scope"
+agent_type: swarm
+posture: "Full or Sign-off"
+blocked_until: "Division 10 life-safety review (counsel, product liability)"
+implementation_status: "Established"
+
+# ── Runtime activation gate ───────────────────────────────────────────────────
+is_active: false           # NEVER set to true without explicit go-ahead
+activation_gate: MUST_APPROVE_BEFORE_LIVE
+
+model: null                # resolved at runtime via config_registry.resolve(tenant_id, agent_id)
+runtime: google-adk
+
+# ── Sub-agents (skill mesh) ───────────────────────────────────────────────────
+sub_agents:
+  - name: spec_reader_agent
+    role: "Spec Reader"
+    authority: DECIDE_AND_REPORT
+  - name: vendor_pricer_agent
+    role: "Vendor Pricer"
+    authority: DECIDE_AND_REPORT
+  - name: vendor_account_opener_agent
+    role: "Vendor Account Opener"
+    authority: DECIDE_AND_REPORT
+# ── Authority gradient ────────────────────────────────────────────────────────
+authority_gradient:
+  DECIDE_AND_REPORT:
+    applies_to: [all_reads, all_analysis, log_decision]
+  MUST_ESCALATE:
+    applies_to: [all_writes, all_external_actions, all_commitments]
+  DECIDE_SILENTLY:
+    applies_to: []          # none — everything is logged
+
+# ── Human gates ───────────────────────────────────────────────────────────────
+human_gates:
+    - Approve
+    - Review
+
+# ── Runtime layers ────────────────────────────────────────────────────────────
+runtime_layers:
+  1_config_registry:
+    status: stub
+    implementation: ../shared/config_registry.py
+    source: "Firestore system_config/bisd_agent_config"
+
+  2_agent_runtime:
+    status: stub
+    implementation: google-adk LlmAgent + Runner
+
+  3_tools:
+    status: stub
+    implementation: ../shared/tool_registry.py
+    artifact: tool_registry.yaml
+    integrations: "Vendor catalogs, pricing, account setup"
+
+  4_memory:
+    status: stub
+    implementation: ../shared/memory.py
+    backend: Vertex AI Agent Engine
+    artifact: memory_schema.yaml
+
+  5_policy_governance:
+    status: stub
+    implementation: ../shared/governance.py + governance-rules.yaml
+
+  6_human_override:
+    status: stub
+    gate_types: [Approve, Review]
+
+  7_workflow:
+    status: stub
+    artifact: workflow.yaml
+    trigger: "Event: Division 10 scope present"
+
+  8_observability:
+    status: stub
+    implementation: ../shared/observability.py
+    destinations:
+      - Cloud Logging (logName: isrds/bisd/division-10-sourcing)
+      - Cloud Monitoring (custom.googleapis.com/isrds/bisd/division-10-sourcing/*)
+
+# ── Notes for build ───────────────────────────────────────────────────────────
+spec_notes: >
+  Vendor accounts opened in Division's name to transfer. Working-capital impact.
+
+# ── Portable artifacts ────────────────────────────────────────────────────────
+artifacts:
+  - agent_spec.yaml          # this file
+  - prompts/orchestrator.md
+  - tool_registry.yaml       # stub — endpoints TBD pending vendor access
+  - memory_schema.yaml       # stub — fields TBD pending requirements
+  - governance-rules.yaml
+  - workflow.yaml
