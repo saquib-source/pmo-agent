@@ -1,0 +1,35 @@
+{
+  "agent_id": "gross-opportunity-agent",
+  "version": "1.0.0",
+  "description": "Long-term memory schema for GOA. Used lightly — mainly for scout inter-run context and watermark supplement. Primary state lives in Cloud SQL.",
+  "memory_surface": "vertex_ai_agent_engine",
+  "keys": [
+    {
+      "key": "scout_last_run_summary",
+      "type": "string",
+      "description": "Summary of the scout's last discovery run: sources found, sources proposed, reasoning. Used to avoid re-discovering the same sources.",
+      "owner": "scout_reasoning",
+      "ttl_days": 90
+    },
+    {
+      "key": "scout_proposed_sources",
+      "type": "array",
+      "description": "List of source names/URLs the scout has already proposed, to avoid duplicating proposals.",
+      "owner": "scout_reasoning",
+      "ttl_days": 365
+    },
+    {
+      "key": "gate_calibration_notes",
+      "type": "string",
+      "description": "Human-provided notes on gate calibration — what to look for or avoid. Informs future classifier prompts.",
+      "owner": "human",
+      "ttl_days": 180
+    }
+  ],
+  "not_in_memory": [
+    "Opportunity records — these live in Cloud SQL (serving) and BigQuery (lake)",
+    "Watermarks — these live in Cloud SQL watermark table",
+    "Rules and scope — these live in Cloud SQL screening_rule and scope tables",
+    "Seen events and rejections — these live in Cloud SQL seen_event and rejection tables"
+  ]
+}
