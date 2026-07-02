@@ -21,8 +21,8 @@ links out to it.
 |---|---|
 | `index.html` | The viewer. Self-contained; reads `tree.data.js`. |
 | `generate_tree.py` | Reads every `agent_spec.yaml` and regenerates the data. Source of truth. |
-| `tree.data.js` | Generated — `window.BISD_TREE = {...}`, consumed by `index.html`. |
-| `tree.json` | Generated — same tree as plain JSON, for wiring into a real app or tests. |
+| `tree.data.js` | Generated & committed — `window.BISD_TREE = {...}`, consumed by `index.html`. The chart works on a fresh clone with no build step. |
+| `tree.json` | Generated but **git-ignored** (repo ignores `*.json`). Same tree as plain JSON, for wiring into a real app or tests. Run the generator to produce it locally. |
 
 ## Regenerate after specs change
 
