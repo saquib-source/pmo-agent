@@ -1,0 +1,32 @@
+[project]
+name = "gross-opportunity-agent"
+version = "1.0.0"
+description = "GOA — Gross Opportunity Agent for Basco Installed Sales Division"
+requires-python = ">=3.11"
+dependencies = [
+    "asyncpg>=0.29",
+    "requests>=2.31",
+    "google-cloud-bigquery>=3.14",
+    "google-cloud-firestore>=2.14",
+    "google-cloud-secret-manager>=2.18",
+    "google-cloud-aiplatform>=1.48",
+    # OpenTelemetry — optional, tracing disabled if not installed
+    "opentelemetry-sdk>=1.22",
+    "opentelemetry-exporter-gcp-trace>=1.5",
+    # ADK — Gap: confirm package name when ADK is published
+    # "google-adk>=0.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.23",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

@@ -1,0 +1,60 @@
+agent_id: gross-opportunity-agent
+version: "1.0.0"
+
+autonomy_policy:
+  ingestion: full
+  normalization: full
+  deduplication: full
+  coarse_gate: full
+  scout_propose_source: full        # Propose only — no execution
+  scout_connect_source: never       # APPROVE gate required
+  bidding: never
+  external_contact: never
+
+approval_gates:
+  - gate_id: approve_new_source
+    description: >
+      Before a new source is enabled in source_registry, a human must review the
+      scout's proposal and set enabled = true. The scout writes candidates with
+      enabled = false. No connector runs without this gate.
+    approvers: [manmeet]
+    required: true
+
+escalation_rules:
+  - trigger: source_silent_2x_cadence
+    action: log_warning_to_firestore
+    severity: warn
+  - trigger: source_silent_4x_cadence
+    action: escalate_to_human
+    severity: critical
+    channel: platform_alert    # Gap: wire to PagerDuty or Slack
+
+guardrails:
+  - id: no_external_write
+    description: The agent never writes to any system outside the four data stores. No API calls that mutate external state.
+    enforcement: code_review
+  - id: no_bid_no_contact
+    description: The agent never submits a bid or contacts any external party. Bidding and contact are out of scope.
+    enforcement: agent_spec + code_review
+  - id: recall_first
+    description: When the gate or classifier is uncertain, keep the record. Dropping requires a clear exclude match.
+    enforcement: gate/rules.py + gate/classifier.py
+  - id: vendor_neutral
+    description: No vendor or model name is hardcoded in any agent function. All engines resolved via config_registry.resolve().
+    enforcement: quality_gate.py + code_review
+  - id: idempotency
+    description: Every record commit is atomic with the fired_marker insert. No double-writes regardless of retries.
+    enforcement: dedup/idempotency.py + cloudsql.check_and_mark_fired
+
+data_policy:
+  personal_data: minimal
+  allowed_fields: [project_name, owner_entity, normalized_address, bid_date, valuation, csi_divisions]
+  prohibited_fields: [personal_contact, banking_detail]
+  full_record_access: on_demand_only    # Fetched only when a human requests pull_full_report
+  terms_compliance:
+    - source: SAM.gov
+      access_method: public_api
+    - source: alert_email_portals
+      access_method: email_alert        # Not scraping — consuming emails the portal sends us
+    - source: firecrawl
+      restriction: only_where_scraping_expressly_permitted
