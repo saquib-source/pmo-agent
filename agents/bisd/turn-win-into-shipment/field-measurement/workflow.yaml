@@ -1,0 +1,39 @@
+version: "1.0"
+artifact_type: workflow_definition
+swarm: bisd
+agent: field-measurement
+tenant: basco
+status: STUB               # implement during build Phase 3
+
+name: field_measurement_workflow
+display_name: "Field Measurement Workflow"
+description: >
+  Workflow for Field Measurement.
+  Business object: Opening dimensions.
+  Posture: Augment.
+
+trigger:
+  type: event
+  source: "Event: branch by project type (renovation vs new construction)"
+
+is_active: false           # workflow does not run until Config Registry is_active = true
+
+steps:
+      - id: execute
+        agent: field_measurement_agent
+        action: "STUB — define during build Phase 3"
+        output: field_measurement_result
+
+
+# ── Thresholds (override via Config Registry) ─────────────────────────────────
+thresholds:
+  sla_hours: null          # TBD — to be confirmed during build Phase 5
+  escalate_after_hours: null
+
+# ── Outputs ───────────────────────────────────────────────────────────────────
+outputs:
+  - trust_ledger:
+      action: log_decision
+      always: true
+  - cloud_logging:
+      log_name: isrds/bisd/field-measurement

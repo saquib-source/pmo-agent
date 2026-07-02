@@ -1,0 +1,38 @@
+version: "1.0"
+artifact_type: memory_schema
+swarm: bisd
+agent: install-or-furnish-decision
+tenant: basco
+status: STUB               # fields are placeholders; populate during build Phase 4
+description: >
+  Persistent memory for Install-or-Furnish Decision.
+  Business object: Fulfillment mode.
+retention_days: 90
+
+namespaces:
+  jobs:
+    description: "Per-job state and decision history"
+    keys:
+      job_id:          "Unique job identifier (from aggregation upstream)"
+      last_action_at:  "ISO timestamp of last agent action on this job"
+      action_count:    "Total actions taken on this job"
+      outcome:         "Last recorded outcome (null until set)"
+      gate_count:      "Number of human gates opened for this job"
+
+  decisions:
+    description: "Decision log (mirrors Trust Ledger subset)"
+    keys:
+      decision_id:     "UUID of the decision record"
+      action:          "Action attempted"
+      authority:       "Authority level used (MUST_ESCALATE / DECIDE_AND_REPORT)"
+      gate_type:       "Gate opened, if any (null for allowed actions)"
+      timestamp:       "ISO timestamp"
+      outcome:         "approved / denied / pending"
+
+  performance:
+    description: "Running metrics for this agent function"
+    keys:
+      run_count:       "Total agent runs completed"
+      avg_duration_ms: "Rolling average run duration"
+      gate_open_count: "Total governance gates opened"
+      error_count:     "Total errors encountered"

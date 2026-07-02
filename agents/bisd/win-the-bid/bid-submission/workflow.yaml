@@ -1,0 +1,39 @@
+version: "1.0"
+artifact_type: workflow_definition
+swarm: bisd
+agent: bid-submission
+tenant: basco
+status: STUB               # implement during build Phase 3
+
+name: bid_submission_workflow
+display_name: "Bid Submission Workflow"
+description: >
+  Workflow for Bid Submission.
+  Business object: Submitted bid.
+  Posture: Sign-off.
+
+trigger:
+  type: event
+  source: "Event: priced bid ready"
+
+is_active: false           # workflow does not run until Config Registry is_active = true
+
+steps:
+      - id: execute
+        agent: bid_submission_agent
+        action: "STUB — define during build Phase 3"
+        output: bid_submission_result
+
+
+# ── Thresholds (override via Config Registry) ─────────────────────────────────
+thresholds:
+  sla_hours: null          # TBD — to be confirmed during build Phase 5
+  escalate_after_hours: null
+
+# ── Outputs ───────────────────────────────────────────────────────────────────
+outputs:
+  - trust_ledger:
+      action: log_decision
+      always: true
+  - cloud_logging:
+      log_name: isrds/bisd/bid-submission

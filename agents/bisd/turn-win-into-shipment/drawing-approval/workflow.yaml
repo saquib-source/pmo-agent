@@ -1,0 +1,51 @@
+version: "1.0"
+artifact_type: workflow_definition
+swarm: bisd
+agent: drawing-approval
+tenant: basco
+status: STUB               # implement during build Phase 3
+
+name: drawing_approval_workflow
+display_name: "Drawing Approval Workflow"
+description: >
+  Workflow for Drawing Approval.
+  Business object: Approved drawings.
+  Posture: Sign-off.
+
+trigger:
+  type: event
+  source: "Event: order created"
+
+is_active: false           # workflow does not run until Config Registry is_active = true
+
+steps:
+      - id: submittal_generator
+        agent: submittal_generator_agent
+        action: "STUB — define during build Phase 3"
+        output: submittal_generator_result
+      - id: shop_drawing_producer
+        agent: shop_drawing_producer_agent
+        action: "STUB — define during build Phase 3"
+        output: shop_drawing_producer_result
+      - id: approval_cycle_manager
+        agent: approval_cycle_manager_agent
+        action: "STUB — define during build Phase 3"
+        output: approval_cycle_manager_result
+      - id: synthesize
+        agent: drawing_approval_orchestrator
+        action: "Synthesize skill-agent outputs; produce final Approved drawings"
+        gate: Approve
+        output: drawing_approval_result
+
+# ── Thresholds (override via Config Registry) ─────────────────────────────────
+thresholds:
+  sla_hours: null          # TBD — to be confirmed during build Phase 5
+  escalate_after_hours: null
+
+# ── Outputs ───────────────────────────────────────────────────────────────────
+outputs:
+  - trust_ledger:
+      action: log_decision
+      always: true
+  - cloud_logging:
+      log_name: isrds/bisd/drawing-approval

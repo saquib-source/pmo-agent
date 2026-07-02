@@ -1,0 +1,39 @@
+version: "1.0"
+artifact_type: workflow_definition
+swarm: bisd
+agent: closeout-retainage-release
+tenant: basco
+status: STUB               # implement during build Phase 3
+
+name: closeout_retainage_release_workflow
+display_name: "Closeout and Retainage Release Workflow"
+description: >
+  Workflow for Closeout and Retainage Release.
+  Business object: Closeout package and retainage.
+  Posture: Sign-off.
+
+trigger:
+  type: event
+  source: "Event: completion"
+
+is_active: false           # workflow does not run until Config Registry is_active = true
+
+steps:
+      - id: execute
+        agent: closeout_retainage_release_agent
+        action: "STUB — define during build Phase 3"
+        output: closeout_retainage_release_result
+
+
+# ── Thresholds (override via Config Registry) ─────────────────────────────────
+thresholds:
+  sla_hours: null          # TBD — to be confirmed during build Phase 5
+  escalate_after_hours: null
+
+# ── Outputs ───────────────────────────────────────────────────────────────────
+outputs:
+  - trust_ledger:
+      action: log_decision
+      always: true
+  - cloud_logging:
+      log_name: isrds/bisd/closeout-retainage-release

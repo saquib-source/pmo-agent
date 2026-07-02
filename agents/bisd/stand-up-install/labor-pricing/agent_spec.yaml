@@ -1,0 +1,96 @@
+version: "1.0"
+artifact_type: agent_spec
+swarm: bisd
+tenant: basco
+generated_by: isrds-platform
+status: STUB               # set to ACTIVE only when is_active: true in Config Registry
+
+# ── Agent identity ─────────────────────────────────────────────────────────────
+name: labor_pricing_agent
+display_name: "Labor Pricing"
+description: >
+  Labor Pricing agent. Produces: Install labor price.
+
+sub_department: "stand-up-install"
+business_object: "Install labor price"
+agent_type: single
+posture: "Sign-off"
+blocked_until: "Install operating layer (Brian)"
+implementation_status: "Established"
+
+# ── Runtime activation gate ───────────────────────────────────────────────────
+is_active: false           # NEVER set to true without explicit go-ahead
+activation_gate: MUST_APPROVE_BEFORE_LIVE
+
+model: null                # resolved at runtime via config_registry.resolve(tenant_id, agent_id)
+runtime: google-adk
+
+# ── Authority gradient ────────────────────────────────────────────────────────
+authority_gradient:
+  DECIDE_AND_REPORT:
+    applies_to: [all_reads, all_analysis, log_decision]
+  MUST_ESCALATE:
+    applies_to: [all_writes, all_external_actions, all_commitments]
+  DECIDE_SILENTLY:
+    applies_to: []          # none — everything is logged
+
+# ── Human gates ───────────────────────────────────────────────────────────────
+human_gates:
+    - Review
+    - Approve
+
+# ── Runtime layers ────────────────────────────────────────────────────────────
+runtime_layers:
+  1_config_registry:
+    status: stub
+    implementation: ../shared/config_registry.py
+    source: "Firestore system_config/bisd_agent_config"
+
+  2_agent_runtime:
+    status: stub
+    implementation: google-adk LlmAgent + Runner
+
+  3_tools:
+    status: stub
+    implementation: ../shared/tool_registry.py
+    artifact: tool_registry.yaml
+    integrations: "Rate card, in-house cost-floor data"
+
+  4_memory:
+    status: stub
+    implementation: ../shared/memory.py
+    backend: Vertex AI Agent Engine
+    artifact: memory_schema.yaml
+
+  5_policy_governance:
+    status: stub
+    implementation: ../shared/governance.py + governance-rules.yaml
+
+  6_human_override:
+    status: stub
+    gate_types: [Review, Approve]
+
+  7_workflow:
+    status: stub
+    artifact: workflow.yaml
+    trigger: "Event: per job"
+
+  8_observability:
+    status: stub
+    implementation: ../shared/observability.py
+    destinations:
+      - Cloud Logging (logName: isrds/bisd/labor-pricing)
+      - Cloud Monitoring (custom.googleapis.com/isrds/bisd/labor-pricing/*)
+
+# ── Notes for build ───────────────────────────────────────────────────────────
+spec_notes: >
+  Per-door rate card now. Reverse-bid auction ESCALATED to 5.0 Doctrine.
+
+# ── Portable artifacts ────────────────────────────────────────────────────────
+artifacts:
+  - agent_spec.yaml          # this file
+  - prompts/agent.md
+  - tool_registry.yaml       # stub — endpoints TBD pending vendor access
+  - memory_schema.yaml       # stub — fields TBD pending requirements
+  - governance-rules.yaml
+  - workflow.yaml

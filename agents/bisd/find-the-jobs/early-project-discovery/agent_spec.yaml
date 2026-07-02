@@ -1,0 +1,107 @@
+version: "1.0"
+artifact_type: agent_spec
+swarm: bisd
+tenant: basco
+generated_by: isrds-platform
+status: STUB               # set to ACTIVE only when is_active: true in Config Registry
+
+# ── Agent identity ─────────────────────────────────────────────────────────────
+name: early_project_discovery_orchestrator
+display_name: "Early Project Discovery"
+description: >
+  Orchestrator for the Early Project Discovery swarm. Coordinates skill agents to produce: Pre-public projects.
+
+sub_department: "find-the-jobs"
+business_object: "Pre-public projects"
+agent_type: swarm
+posture: "Full or Sign-off"
+blocked_until: "None"
+implementation_status: "Established"
+
+# ── Runtime activation gate ───────────────────────────────────────────────────
+is_active: false           # NEVER set to true without explicit go-ahead
+activation_gate: MUST_APPROVE_BEFORE_LIVE
+
+model: null                # resolved at runtime via config_registry.resolve(tenant_id, agent_id)
+runtime: google-adk
+
+# ── Sub-agents (skill mesh) ───────────────────────────────────────────────────
+sub_agents:
+  - name: planning_monitor_agent
+    role: "Planning Monitor"
+    authority: DECIDE_AND_REPORT
+  - name: zoning_monitor_agent
+    role: "Zoning Monitor"
+    authority: DECIDE_AND_REPORT
+  - name: permit_monitor_agent
+    role: "Permit Monitor"
+    authority: DECIDE_AND_REPORT
+# ── Authority gradient ────────────────────────────────────────────────────────
+authority_gradient:
+  DECIDE_AND_REPORT:
+    applies_to: [all_reads, all_analysis, log_decision]
+  MUST_ESCALATE:
+    applies_to: [all_writes, all_external_actions, all_commitments]
+  DECIDE_SILENTLY:
+    applies_to: []          # none — everything is logged
+
+# ── Human gates ───────────────────────────────────────────────────────────────
+human_gates:
+    - Flag
+    - Review
+
+# ── Runtime layers ────────────────────────────────────────────────────────────
+runtime_layers:
+  1_config_registry:
+    status: stub
+    implementation: ../shared/config_registry.py
+    source: "Firestore system_config/bisd_agent_config"
+
+  2_agent_runtime:
+    status: stub
+    implementation: google-adk LlmAgent + Runner
+
+  3_tools:
+    status: stub
+    implementation: ../shared/tool_registry.py
+    artifact: tool_registry.yaml
+    integrations: "Government and permit data feeds"
+
+  4_memory:
+    status: stub
+    implementation: ../shared/memory.py
+    backend: Vertex AI Agent Engine
+    artifact: memory_schema.yaml
+
+  5_policy_governance:
+    status: stub
+    implementation: ../shared/governance.py + governance-rules.yaml
+
+  6_human_override:
+    status: stub
+    gate_types: [Flag, Review]
+
+  7_workflow:
+    status: stub
+    artifact: workflow.yaml
+    trigger: "Continuous"
+
+  8_observability:
+    status: stub
+    implementation: ../shared/observability.py
+    destinations:
+      - Cloud Logging (logName: isrds/bisd/early-project-discovery)
+      - Cloud Monitoring (custom.googleapis.com/isrds/bisd/early-project-discovery/*)
+
+# ── Notes for build ───────────────────────────────────────────────────────────
+spec_notes: >
+  Feeds Specification Inclusion. Pre-RFP stage.
+
+# ── Portable artifacts ────────────────────────────────────────────────────────
+artifacts:
+  - agent_spec.yaml          # this file
+  - prompts/orchestrator.md
+  - tool_registry.yaml       # stub — endpoints TBD pending vendor access
+  - memory_schema.yaml       # stub — fields TBD pending requirements
+  - governance-rules.yaml
+  - workflow.yaml

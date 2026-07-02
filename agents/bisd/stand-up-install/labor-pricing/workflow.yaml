@@ -1,0 +1,39 @@
+version: "1.0"
+artifact_type: workflow_definition
+swarm: bisd
+agent: labor-pricing
+tenant: basco
+status: STUB               # implement during build Phase 3
+
+name: labor_pricing_workflow
+display_name: "Labor Pricing Workflow"
+description: >
+  Workflow for Labor Pricing.
+  Business object: Install labor price.
+  Posture: Sign-off.
+
+trigger:
+  type: event
+  source: "Event: per job"
+
+is_active: false           # workflow does not run until Config Registry is_active = true
+
+steps:
+      - id: execute
+        agent: labor_pricing_agent
+        action: "STUB — define during build Phase 3"
+        output: labor_pricing_result
+
+
+# ── Thresholds (override via Config Registry) ─────────────────────────────────
+thresholds:
+  sla_hours: null          # TBD — to be confirmed during build Phase 5
+  escalate_after_hours: null
+
+# ── Outputs ───────────────────────────────────────────────────────────────────
+outputs:
+  - trust_ledger:
+      action: log_decision
+      always: true
+  - cloud_logging:
+      log_name: isrds/bisd/labor-pricing

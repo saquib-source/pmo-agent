@@ -1,0 +1,39 @@
+version: "1.0"
+artifact_type: workflow_definition
+swarm: bisd
+agent: completion-sign-off
+tenant: basco
+status: STUB               # implement during build Phase 3
+
+name: completion_sign_off_workflow
+display_name: "Completion Sign-Off Workflow"
+description: >
+  Workflow for Completion Sign-Off.
+  Business object: Completion event.
+  Posture: Sign-off.
+
+trigger:
+  type: event
+  source: "Event: punch cleared"
+
+is_active: false           # workflow does not run until Config Registry is_active = true
+
+steps:
+      - id: execute
+        agent: completion_sign_off_agent
+        action: "STUB — define during build Phase 3"
+        output: completion_sign_off_result
+
+
+# ── Thresholds (override via Config Registry) ─────────────────────────────────
+thresholds:
+  sla_hours: null          # TBD — to be confirmed during build Phase 5
+  escalate_after_hours: null
+
+# ── Outputs ───────────────────────────────────────────────────────────────────
+outputs:
+  - trust_ledger:
+      action: log_decision
+      always: true
+  - cloud_logging:
+      log_name: isrds/bisd/completion-sign-off

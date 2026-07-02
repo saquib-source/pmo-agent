@@ -1,0 +1,51 @@
+version: "1.0"
+artifact_type: workflow_definition
+swarm: bisd
+agent: consolidated-shipment
+tenant: basco
+status: STUB               # implement during build Phase 3
+
+name: consolidated_shipment_workflow
+display_name: "Consolidated Shipment Workflow"
+description: >
+  Workflow for Consolidated Shipment.
+  Business object: Consolidated delivery.
+  Posture: Full or Sign-off.
+
+trigger:
+  type: event
+  source: "Event: doors and Division 10 ready"
+
+is_active: false           # workflow does not run until Config Registry is_active = true
+
+steps:
+      - id: staging_coordinator
+        agent: staging_coordinator_agent
+        action: "STUB — define during build Phase 3"
+        output: staging_coordinator_result
+      - id: cross_dock_agent
+        agent: cross_dock_agent_agent
+        action: "STUB — define during build Phase 3"
+        output: cross_dock_agent_result
+      - id: load_builder
+        agent: load_builder_agent
+        action: "STUB — define during build Phase 3"
+        output: load_builder_result
+      - id: synthesize
+        agent: consolidated_shipment_orchestrator
+        action: "Synthesize skill-agent outputs; produce final Consolidated delivery"
+        gate: Review
+        output: consolidated_shipment_result
+
+# ── Thresholds (override via Config Registry) ─────────────────────────────────
+thresholds:
+  sla_hours: null          # TBD — to be confirmed during build Phase 5
+  escalate_after_hours: null
+
+# ── Outputs ───────────────────────────────────────────────────────────────────
+outputs:
+  - trust_ledger:
+      action: log_decision
+      always: true
+  - cloud_logging:
+      log_name: isrds/bisd/consolidated-shipment

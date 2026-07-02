@@ -1,0 +1,35 @@
+version: "1.0"
+artifact_type: governance_rules
+swarm: bisd
+agent: completion-sign-off
+tenant: basco
+status: STUB               # finalize during build Phase 5
+description: >
+  Authority gradient rules for Completion Sign-Off.
+  Posture: Sign-off.
+  Business object: Completion event.
+
+rules:
+  - action: read_data
+    decision: allow
+    rationale: "Read-only access — no side-effects."
+
+  - action: analyze
+    decision: allow
+    rationale: "Analysis only — no external action."
+
+  - action: log_decision
+    decision: allow
+    rationale: "Append-only Trust Ledger write — cannot modify existing records." 
+  - action: commit_external_action
+    decision: gate
+    gate: Approve
+    hard_stop: true
+    timeout: null           # HARD GATE — no timeout. Agent waits indefinitely.
+    rationale: "Irreversible external action. Requires explicit human approval. No timeout." 
+  - action: draft_output
+    decision: gate
+    gate: Review
+    hard_stop: false
+    timeout_hours: 24
+    rationale: "Output must be reviewed before delivery." 
