@@ -147,7 +147,15 @@ def get_stall_thresholds() -> dict:
     }
 
 def get_jira_projects() -> list:
-    return list(get("jira_projects", ["ASHS", "BAS", "BTK", "FQ", "ISRDS", "MDP", "SOC", "UNCS"]))
+    """Projects the swarm scans. 'ALL' / '*' (env or DB value) resolves to the
+    live-discovered list of every project the Jira token can see — briefs and
+    prompts always name the real projects, and new Jira projects appear
+    automatically on the next run, no redeploy."""
+    projs = list(get("jira_projects", ["ASHS", "BAS", "BTK", "FQ", "ISRDS", "MDP", "SOC", "UNCS"]))
+    if any(str(p).strip().upper() in ("ALL", "*") for p in projs):
+        from .jira_client import ALL_PROJECTS
+        return list(ALL_PROJECTS)
+    return projs
 
 def is_observability_enabled() -> bool:
     return bool(get("observability_enabled", True))

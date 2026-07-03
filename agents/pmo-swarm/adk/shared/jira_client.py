@@ -9,19 +9,49 @@ from pathlib import Path
 
 # ── Config ──────────────────────────────────────────────────────────────────
 
-def _get_allowed_projects() -> list:
-    """Return the list of projects this swarm is authorised to scan.
-    Reads JIRA_PROJECTS env var; falls back to all known projects only if
-    the env var is absent (production always sets it).
-    """
-    raw = os.environ.get("JIRA_PROJECTS", "")
-    if raw:
-        return [p.strip() for p in raw.split(",") if p.strip()]
-    return ["ASHS", "BAS", "BTK", "FQ", "ISRDS", "MDP", "SOC", "UNCS"]
+# Last-resort list, used only when live discovery is impossible (no Jira creds
+# in the environment, or the API call fails). Production sets JIRA_PROJECTS=ALL
+# and discovers the real list live, so new Jira projects are picked up
+# automatically on the next run — no redeploy.
+_STATIC_FALLBACK_PROJECTS = ["ASHS", "BAS", "BTK", "FQ", "ISRDS", "MDP", "SOC", "UNCS"]
 
-# Evaluated at import time — agents reference this for the "ALL" shorthand.
-# Because JIRA_PROJECTS is set in .env before any import, this is safe.
-ALL_PROJECTS = _get_allowed_projects()
+
+def discover_all_projects() -> list:
+    """Every project key this token can see, live from Jira
+    (GET /project/search, paginated). Returns [] on any error so callers can
+    fall back — never raises."""
+    keys, start = [], 0
+    while True:
+        data = jira_request("GET", "/project/search",
+                            params={"startAt": start, "maxResults": 100})
+        if not isinstance(data, dict) or "error" in data:
+            return []
+        values = data.get("values", [])
+        keys.extend(p.get("key") for p in values if p.get("key"))
+        if data.get("isLast", True) or not values:
+            break
+        start += len(values)
+    return sorted(set(keys))
+
+
+def _get_allowed_projects() -> list:
+    """The projects this swarm scans.
+
+    JIRA_PROJECTS env:
+      • "ALL" or "*" or unset → live discovery of every project the token can
+        see (falls back to the static list only if discovery fails)
+      • explicit CSV ("ISRDS,BAS") → exactly that list
+    """
+    raw = os.environ.get("JIRA_PROJECTS", "").strip()
+    if raw and raw.upper() not in ("ALL", "*"):
+        explicit = [p.strip() for p in raw.split(",") if p.strip()]
+        if not any(p.upper() in ("ALL", "*") for p in explicit):
+            return explicit
+    live = discover_all_projects()
+    return live or list(_STATIC_FALLBACK_PROJECTS)
+
+# NOTE: ALL_PROJECTS is assigned after jira_request is defined (below) —
+# discovery calls it at import time.
 
 RACI_FIELDS = {
     "accountable":  "customfield_11661",
@@ -91,6 +121,13 @@ def jira_request(method: str, path: str, params: dict = None, json_body: dict = 
             return r.json()
     except Exception as e:
         return {"error": f"{type(e).__name__}: {e}"}
+
+
+# Evaluated at import time — agents reference this for the "ALL" shorthand.
+# Because JIRA_PROJECTS is set in .env before any import, this is safe. The
+# Cloud Run job is a fresh process per scheduled run, so the discovered list
+# is re-resolved daily.
+ALL_PROJECTS = _get_allowed_projects()
 
 
 # ── Extraction ───────────────────────────────────────────────────────────────

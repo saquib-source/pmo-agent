@@ -74,7 +74,7 @@ if $DO_JOB; then
   ENV_VARS+=",JIRA_URL=https://lixillabs.atlassian.net"
   ENV_VARS+=",JIRA_EMAIL=saquib@isrdsystems.com"
   ENV_VARS+=",JIRA_PROJECT=ISRDS"
-  ENV_VARS+=",JIRA_PROJECTS=ISRDS"
+  ENV_VARS+=",JIRA_PROJECTS=ALL"   # ALL = live-discover every project the token can see
   ENV_VARS+=",JIRA_SPRINT_FIELD=customfield_10007"
   ENV_VARS+=",TENANT_ID=isrds"
   ENV_VARS+=",CLOUD_SQL_INSTANCE=${CLOUD_SQL_INSTANCE}"
