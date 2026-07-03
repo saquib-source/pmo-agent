@@ -1,0 +1,33 @@
+{
+  "_comment": "Template for a new REST source. Copy to <source_id>.json, fill in, register via jobs/seed_local.py or the source_registry table. A clean source is a config file + one-line method registration in goa/adapters/__init__.py — not new code.",
+  "source_id": "CHANGE_ME",
+  "name": "CHANGE_ME",
+  "method": "rest",
+  "base_url": "https://example.com/api/opportunities",
+  "auth": {
+    "type": "api_key",
+    "header": "Authorization",
+    "secret_ref": "projects/<project>/secrets/<name>/versions/latest"
+  },
+  "pagination": {
+    "style": "offset",
+    "offset_param": "offset",
+    "total_field": "total"
+  },
+  "query_params": { "limit": 100 },
+  "watermark_field": null,
+  "rate_limit": { "requests_per_second": 1 },
+  "field_map": {
+    "project_name": null,
+    "owner": null,
+    "valuation": null,
+    "bid_date": null,
+    "primary_source_url": null,
+    "source_record_id": null,
+    "street": null,
+    "city": null,
+    "state": null,
+    "postal_code": null,
+    "country": null
+  }
+}

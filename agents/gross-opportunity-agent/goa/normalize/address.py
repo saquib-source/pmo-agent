@@ -21,10 +21,21 @@ _STATE_ABBREV = {
 }
 
 
-def normalize_street(street: str | None) -> str:
-    if not street:
+def _as_text(v) -> str:
+    """Coerce a field value to text. Some sources (SAM.gov) return address parts as
+    either a plain string or a {name}/{code}/{value} dict, inconsistently per record."""
+    if v is None:
         return ""
-    s = street.lower().strip()
+    if isinstance(v, dict):
+        v = v.get("name") or v.get("code") or v.get("value") or ""
+    return str(v)
+
+
+def normalize_street(street) -> str:
+    s = _as_text(street)
+    if not s:
+        return ""
+    s = s.lower().strip()
     # Strip unit / suite / apt designations
     s = re.sub(r"\b(suite|ste|apt|unit|#)\s*\S+", "", s)
     tokens = s.split()
@@ -32,12 +43,12 @@ def normalize_street(street: str | None) -> str:
     return " ".join(expanded).strip()
 
 
-def normalize_city(city: str | None) -> str:
-    return (city or "").lower().strip()
+def normalize_city(city) -> str:
+    return _as_text(city).lower().strip()
 
 
-def normalize_state(state: str | None) -> str:
-    s = (state or "").lower().strip()
+def normalize_state(state) -> str:
+    s = _as_text(state).lower().strip()
     return s if s in _STATE_ABBREV else s
 
 

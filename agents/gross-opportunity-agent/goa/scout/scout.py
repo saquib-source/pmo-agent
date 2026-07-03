@@ -1,38 +1,79 @@
 """
 Source discovery scout — finds new aggregators, boards, and feeds, proposes them for human approval.
-Tier 2–3: reasoning model with web search. Runs infrequently (weekly Calibrated default).
-Config Registry role: scout_reasoning → claude-fable-5 with web_search tool.
+Tier 2–3: a reasoning engine (resolved at runtime from Config Registry role 'scout_reasoning').
+Runs infrequently (weekly Calibrated default). No vendor or model name appears in this file.
 Section 6.6 of the build spec. APPROVE gate: the scout never connects a source on its own.
 """
 
 from __future__ import annotations
+import asyncio
 import logging
 import uuid
 from datetime import datetime
 
 from ..stores import cloudsql
-from ..stores.config_registry import get_version, get_family, get_tools
+from ..engine import run_role_json
 
 log = logging.getLogger(__name__)
 
+_SCOUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "candidates": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "source_id": {"type": "string"},
+                    "name": {"type": "string"},
+                    "method": {"type": "string"},
+                    "url": {"type": "string"},
+                    "why_relevant": {"type": "string"},
+                },
+                "required": ["source_id", "name", "method", "url", "why_relevant"],
+                "additionalProperties": False,
+            },
+        }
+    },
+    "required": ["candidates"],
+    "additionalProperties": False,
+}
 
-async def run_scout() -> list[dict]:
-    """Run the source discovery scout. Returns list of candidate sources proposed."""
-    engine_family = get_family("scout_reasoning")
-    engine_version = get_version("scout_reasoning")
-    tools = get_tools("scout_reasoning")
-    log.info("Scout: running engine=%s %s tools=%s", engine_family, engine_version, tools)
+_SCOUT_SYSTEM = (
+    "You are a source-discovery scout for a commercial-construction opportunity pipeline. "
+    "Propose NEW public bid boards, permit feeds, and opportunity aggregators the pipeline "
+    "may not already cover, relevant to CSI Division 10 (toilet partitions, shower "
+    "enclosures), Division 08 (openings/glazing), and Division 22 (plumbing fixtures) in the "
+    "United States. You NEVER connect a source — every proposal is written to the registry "
+    "as disabled and awaits human APPROVE. Propose real, well-known public sources; do not "
+    "invent URLs. Return a list; an empty list is fine if nothing new is warranted."
+)
 
-    # Gap: wire to ADK model call with web_search tool
-    # The model is prompted with the scope (CSI 10/08/22, shower/partition products, US geographies)
-    # and asked to find new public bid boards, permit feeds, and aggregators
-    # that the current source registry doesn't cover.
-    # It returns a structured list of candidate sources.
-    candidates: list[dict] = []  # Stub until ADK runtime is wired
+
+async def run_scout(existing_source_ids: list[str] | None = None) -> list[dict]:
+    """Run the source discovery scout. Returns list of candidate sources proposed.
+    Every candidate is written disabled/unknown — the human APPROVE gate enables it.
+    """
+    existing = existing_source_ids or []
+    prompt = (
+        "Sources already in the registry (do not re-propose):\n"
+        f"  {existing}\n\n"
+        "Propose new candidate sources for the scope above."
+    )
+    try:
+        result = await asyncio.to_thread(
+            run_role_json, "scout_reasoning", _SCOUT_SYSTEM, prompt, _SCOUT_SCHEMA
+        )
+        candidates = result.get("candidates", [])
+    except Exception as e:
+        log.warning("Scout run failed: %s", e)
+        return []
 
     for candidate in candidates:
+        candidate.setdefault("config", {"url": candidate.get("url")})
         await _propose_source(candidate)
 
+    log.info("Scout: proposed %d candidate source(s) — all awaiting human APPROVE", len(candidates))
     return candidates
 
 

@@ -42,3 +42,4 @@ class CanonicalOpportunity:
     fetch_state: str = "summary"           # summary | pulling | full_pulled | failed
     fetch_error: dict | None = None        # {code, message, failed_at}
     full_record: dict | None = None
+    agent_trace: dict | None = None        # per-record pipeline trace (normalize/dedup/gate)

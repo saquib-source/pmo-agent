@@ -12,9 +12,12 @@ from typing import Literal
 
 log = logging.getLogger(__name__)
 
-# Gap: set via environment
 _PROJECT = os.environ.get("GOOGLE_CLOUD_PROJECT")
 _COLLECTION = "live/projects/gross_opportunity/activity"
+# GOA_SKIP_ACTIVITY=1 disables the Firestore ticker (for local runs where the
+# Firestore gRPC client is proxy-blocked). The activity stream is a UI nicety, not
+# part of the serving path. Unset in production (Cloud Run).
+_SKIP = os.environ.get("GOA_SKIP_ACTIVITY") == "1"
 
 ActivityType = Literal["pulled", "normalized", "deduped", "gated_kept", "gated_dropped", "forked", "source_silent"]
 
@@ -31,6 +34,8 @@ async def log_activity(
     opportunity_id: str | None = None,
 ) -> None:
     """Append one activity event to the stream. Non-blocking best-effort."""
+    if _SKIP:
+        return
     try:
         client = _client()
         doc = client.collection(_COLLECTION).document()

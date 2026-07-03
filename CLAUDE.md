@@ -53,7 +53,17 @@ isrds/
 │   │   ├── memory-schema.json
 │   │   ├── governance-rules.yaml
 │   │   └── workflow.py
-│   └── survey_agents/               # Survey Agent artifacts
+│   ├── survey_agents/               # Survey Agent artifacts
+│   ├── gross-opportunity-agent/     # GOA — six-agent RFP-finding swarm (DEPLOYED, see below)
+│   │   ├── goa/                     # orchestrator, adapters, normalize, dedup, gate, stores, events
+│   │   ├── config/engines.json      # Config Registry: role → engine binding (committed)
+│   │   ├── config/sources/*.json    # source configs (SAM.gov query plan, budget, field map)
+│   │   ├── jobs/                    # seed, backfill, delta, expiration_sweep
+│   │   ├── screen/index.html        # reviewer console (queue, agent swarm, activity, stats)
+│   │   ├── sql/                     # Cloud SQL + BigQuery DDL
+│   │   └── README.md                # full local-run + deploy runbook
+│   └── bisd/                        # BISD: 34 agentic function scaffolds + org chart
+│       └── org-chart/               # deployed interactive tree (generate_tree.py → tree.data.js)
 ├── migrations/                       # Database migrations & data transformations
 ├── .claude/
 │   └── skills/
@@ -104,6 +114,55 @@ Read the corresponding reference:
 ### To Deploy to GCP/ADK
 See `references/deploy.md` — artifacts deploy as-is to Vertex AI Agent Engine.
 
+## Gross Opportunity Agent (GOA) — the deployed production pattern
+
+`agents/gross-opportunity-agent/` is the worked example of how we build agents here.
+When creating or debugging agents, reuse these patterns (full runbook in its README.md):
+
+- **Config Registry in practice** — function code calls `run_role("gate_classifier", …)`
+  (`goa/engine/runner.py`); the role→engine binding lives ONLY in `config/engines.json`.
+  Env overrides (still config, never code): `GOA_ENGINE_TRANSPORT=anthropic|vertex`,
+  `GOA_ENGINE_OVERRIDE_VERSION` (+`_FAMILY`) for local runs.
+- **Config-driven source adapters** — a new REST source is a JSON file in
+  `config/sources/` (auth, pagination, field_map, query_plan) + registration via
+  `jobs/seed.py`; adapter code stays generic (`goa/adapters/rest_adapter.py`).
+- **API request budget (never 429)** — per-source `rate_limit.requests_per_day` +
+  `reserve_for_ui`, persisted per UTC-day in Cloud SQL `api_request_ledger`; the
+  orchestrator hands the adapter a per-run budget; adapter raises `BudgetExhausted`
+  BEFORE exceeding it. Quota upgrade = env `GOA_REQUESTS_PER_DAY=1000` (wins) or edit
+  config + re-run `jobs.seed`.
+- **Swarm observability** — every pipeline step logs to `agent_activity` attributed to
+  one of 8 agents (`goa/agents_meta.py`); the console's Agent Swarm tab renders
+  per-agent status/logs from `/api/agents`, `/api/activity?agent=`, `/api/budget`.
+- **Idempotency & dedup** — `fired_marker` hash (atomic, pre-model-cost), then
+  `project_identity_key` merge, then fuzzy/embedding/model arbitration. Watermark only
+  advances on fully-successful runs.
+
+**Deployed (project isr-division-systems-488723, us-central1):**
+| Resource | Value |
+|---|---|
+| Console (UI + Events API) | Cloud Run `goa-console` → https://goa-console-1059272334202.us-central1.run.app |
+| Daily pull job | Cloud Run job `goa-daily-delta` (`python -m jobs.delta --source sam_gov`) |
+| Schedule | Cloud Scheduler `goa-daily-delta-trigger`, `30 0 * * *` UTC (right after SAM.gov quota reset) |
+| Secrets | `goa-cloudsql-dsn`, `sam-gov-api-key`, `goa-anthropic-api-key` (Secret Manager) |
+| Serving store | Cloud SQL `tier3` / `isrds_db` (asyncpg, public IP) · lake: BigQuery dataset `goa` |
+| BISD org chart | GCS `gs://isrds-bisd-org-chart` → https://storage.googleapis.com/isrds-bisd-org-chart/index.html (live-fetches GOA `/api/counts`; opens console in a full-screen modal) |
+
+## Local dev environment quirks (Mohd's machine — corporate proxy)
+
+- Google Python clients (gRPC: BigQuery/Firestore/SecretManager/Vertex) are proxy-blocked
+  locally → set `GOA_SKIP_LAKE=1`, `GOA_SKIP_ACTIVITY=1`, use asyncpg + direct Anthropic
+  API locally; verify gRPC paths on Cloud Run.
+- HTTPS (httpx/requests) needs the combined CA bundle: `scripts/build_ca_bundle.sh`,
+  then `SSL_CERT_FILE`/`REQUESTS_CA_BUNDLE` point at it. `GOA_FORCE_IPV4=1` (IPv6 to
+  api.sam.gov is broken locally).
+- **gcloud**: use `CLOUDSDK_PYTHON=/opt/homebrew/bin/python3.12` + one-time
+  `gcloud config set core/custom_ca_certs_file <combined bundle>` — then `run deploy
+  --source`, `scheduler`, `builds`, `storage` all work locally. (/usr/bin/python3 = 3.9
+  crashes on newer gcloud surfaces.)
+- `gcloud run deploy --source` needs the explicit `.gcloudignore` in the agent dir —
+  without it gcloud mirrors .gitignore and drops `config/*.json` from the image.
+
 ## Key Files
 
 | File | Purpose |
@@ -112,6 +171,9 @@ See `references/deploy.md` — artifacts deploy as-is to Vertex AI Agent Engine.
 | `.claude/skills/isrds-agent-builder/scripts/quality_gate.py` | Enforces vendor-neutrality and artifact coherence |
 | `agents/pmo-swarm/` | First proving agent (PMO Agent) |
 | `agents/survey_agents/` | Second proving agent (Survey Agent) |
+| `agents/gross-opportunity-agent/README.md` | GOA runbook: local run, deploy, budget, schedule |
+| `agents/gross-opportunity-agent/config/engines.json` | Config Registry — the ONLY place engine bindings live |
+| `agents/bisd/org-chart/generate_tree.py` | Org chart generator (PROTO block wires live GOA link/API) |
 | `README.md` | User-facing setup, features, and troubleshooting |
 
 ## Important Rules
@@ -141,10 +203,13 @@ See `references/deploy.md` — artifacts deploy as-is to Vertex AI Agent Engine.
 
 1. **PMO Agent**: Finish first proving agent (Jira integration, Gemini AI, daily Operating Briefs)
 2. **Survey Agent**: Build second proving agent (customer feedback collection & analysis)
-3. **Swarm Industrialization**: Stand up orchestration layer to generate remaining 81 agents across 4 tenants
-4. **Config Registry**: Build vendor-neutral runtime engine that resolves `(tenant_id, agent_id)` → `(model, tools, guardrails)`
+3. **GOA**: register SAM.gov system-account role (1,000 req/day, free, ~2–3 weeks) → flip
+   `GOA_REQUESTS_PER_DAY=1000` on the Cloud Run job; widen `query_plan` keywords/NAICS;
+   lock the public console behind IAM when the demo phase ends
+4. **Swarm Industrialization**: Stand up orchestration layer to generate remaining 81 agents across 4 tenants
+5. **Config Registry**: Build vendor-neutral runtime engine that resolves `(tenant_id, agent_id)` → `(model, tools, guardrails)`
 
 ---
 
-**Last Updated**: 2026-06-24  
+**Last Updated**: 2026-07-03  
 **Architecture Version**: Complete Architecture Document v2.2

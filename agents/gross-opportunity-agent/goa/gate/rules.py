@@ -35,6 +35,21 @@ def _val(rule_value: Any) -> Any:
     return rule_value
 
 
+def _scope_values(dim_val: Any) -> list:
+    """Flatten a scope dimension to comparable primitives. csi_divisions is stored as
+    [{code,label,status}] objects; project_types/geographies as plain string lists."""
+    dim_val = _val(dim_val)
+    if not isinstance(dim_val, list):
+        return dim_val
+    out = []
+    for item in dim_val:
+        if isinstance(item, dict):
+            out.append(item.get("code") or item.get("value") or item.get("name"))
+        else:
+            out.append(item)
+    return [x for x in out if x is not None]
+
+
 def _field_value(opp: Any, field: str) -> Any:
     """Extract the field value from a CanonicalOpportunity by dotted path."""
     if field == "project_name_and_body":
@@ -125,17 +140,18 @@ def evaluate(opp: Any, rules: list[dict], scope: dict) -> dict:
     }
     scope_match = True
     for dim, (field, op) in scope_dims.items():
-        dim_val = scope.get(dim, [])
+        dim_val = _scope_values(scope.get(dim, []))
         result = _evaluate_rule({"field": field, "operator": op, "value": dim_val, "rule_id": f"scope_{dim}"}, opp)
         if result is False:
             scope_match = False
 
-    # Hard excludes from scope
-    hard_excludes = scope.get("hard_excludes", [])
-    if hard_excludes:
+    # Hard excludes from scope. JSONB arrives as a string from the DB — parse it, else
+    # iterating a string yields single characters and every record matches.
+    hard_excludes = _val(scope.get("hard_excludes", [])) or []
+    if isinstance(hard_excludes, list):
+        text = f"{opp.project_name or ''} {opp.owner or ''}".lower()
         for exclude_term in hard_excludes:
-            text = str(opp.project_name or "").lower()
-            if str(exclude_term).lower() in text:
+            if exclude_term and str(exclude_term).lower() in text:
                 return {"passed": False, "score": 0.0, "matched_rules": ["scope_hard_exclude"], "needs_classifier": False}
 
     if include_matched and scope_match:

@@ -89,6 +89,22 @@ ul.collapsed{display:none}
 .proto-cta a:hover{text-decoration:underline}
 .err{margin:40px auto;max-width:520px;padding:18px 20px;border:1px solid var(--watch);border-radius:6px;background:#FBF3E2;color:#6B531A;font-size:13px;line-height:1.5}
 .err code{font-family:var(--mono);background:#fff;padding:1px 5px;border-radius:3px}
+
+/* Full-screen console modal (embeds the deployed Gross Opportunity console) */
+.console-modal{position:fixed;inset:0;z-index:50;display:none;flex-direction:column;background:rgba(27,39,51,.55);backdrop-filter:blur(2px)}
+.console-modal.open{display:flex}
+.console-shell{flex:1;display:flex;flex-direction:column;margin:16px;border-radius:8px;overflow:hidden;background:var(--card);box-shadow:0 18px 60px -12px rgba(15,25,36,.55);border:1px solid var(--line)}
+.console-head{display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--ink);color:#fff;flex-shrink:0}
+.console-head .cmark{width:22px;height:22px;border-radius:4px;background:var(--agent);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800}
+.console-head .ct{font-size:12.5px;font-weight:700}
+.console-head .cs{font-size:10px;color:#AEBCCE;font-family:var(--mono)}
+.console-head a{font-size:10.5px;color:#BFD3EA;text-decoration:none;border:1px solid #3B4A5E;border-radius:4px;padding:3px 9px;white-space:nowrap}
+.console-head a:hover{border-color:#BFD3EA}
+.console-head .cx{cursor:pointer;border:1px solid #3B4A5E;border-radius:4px;background:transparent;color:#fff;font-size:12px;line-height:1;padding:4px 9px}
+.console-head .cx:hover{border-color:#fff}
+.console-body{flex:1;position:relative;background:#E7ECF2}
+.console-body iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.console-body .cload{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12.5px;color:var(--muted);font-family:var(--mono);pointer-events:none}
 </style></head>
 <body>
 <div class="top">
@@ -105,6 +121,26 @@ ul.collapsed{display:none}
 <div class="hint">Click any <b>node</b> to open its children. Basco &rarr; 4 value-chain stages &rarr; 9 sub-departments &rarr; 34 agentic functions. Leaf cells are the individual agents. Data generated from the <b>agent_spec.yaml</b> files.</div>
 
 <div class="stage"><div class="tree" id="tree"></div></div>
+
+<!-- Full-screen console modal: the Gross Opportunity console opens in place. -->
+<div class="console-modal" id="consoleModal" aria-hidden="true">
+  <div class="console-shell">
+    <div class="console-head">
+      <div class="cmark">GOA</div>
+      <div>
+        <div class="ct">Gross Opportunity — Console</div>
+        <div class="cs" id="consoleUrl"></div>
+      </div>
+      <span class="spacer"></span>
+      <a id="consoleNewTab" href="#" target="_blank" rel="noopener">Open in new tab &#8599;</a>
+      <button class="cx" id="consoleClose" title="Close (Esc)">&#10005; Close</button>
+    </div>
+    <div class="console-body">
+      <div class="cload" id="consoleLoading">loading console&hellip;</div>
+      <iframe id="consoleFrame" title="Gross Opportunity console" src="about:blank"></iframe>
+    </div>
+  </div>
+</div>
 
 <!-- Data is generated from the specs by generate_tree.py -->
 <script src="tree.data.js"></script>
@@ -144,9 +180,9 @@ function fnInner(f){
     +(f.gates||[]).map(function(g){return '<span class="chip gate">'+esc(g)+'</span>';}).join('')+'</div>';
   if(f.blocked && f.blocked!=="None") h+='<div class="blocked-note">&#9650; '+esc(f.blocked)+'</div>';
   h+=fnMesh(f);
-  if(f.proto && f.sim) h+='<div class="proto-cta"><div class="pm"><b>'+esc(f.sim.active)+'</b><s>active</s></div>'
-    +'<div class="pm"><b>'+esc(f.sim["new"])+'</b><s>new</s></div>'
-    +'<a href="'+esc(f.link)+'" target="_blank" rel="noopener">Open &rarr;</a></div>';
+  if(f.proto && f.sim) h+='<div class="proto-cta"><div class="pm"><b data-live="active">'+esc(f.sim.active)+'</b><s data-live="active-lbl">active</s></div>'
+    +'<div class="pm"><b data-live="new">'+esc(f.sim["new"])+'</b><s data-live="new-lbl">new</s></div>'
+    +'<a href="'+esc(f.link)+'" class="openconsole" data-console="'+esc(f.link)+'">Open &rarr;</a></div>';
   return h;
 }
 function setExp(exp, open, count){
@@ -194,6 +230,69 @@ function build(){
   tree.appendChild(rootUl);
 }
 build();
+
+// ── Live metrics: pull REAL counts from the deployed Gross Opportunity console. ──
+// The proto node carries live_api (Cloud Run Events API). On success the card and
+// the header badge flip to LIVE; on any failure the simulated numbers stay put.
+var _liveCounts=null;
+function findLiveApi(node){
+  if(node.live_api) return node.live_api;
+  var kids=node.children||[];
+  for(var i=0;i<kids.length;i++){var r=findLiveApi(kids[i]); if(r) return r;}
+  return null;
+}
+function applyLive(){
+  if(!_liveCounts) return;
+  var a=document.querySelector('[data-live="active"]'), n=document.querySelector('[data-live="new"]');
+  if(a) a.textContent=_liveCounts.total_active;
+  if(n) n.textContent=_liveCounts.new_count;
+  var badge=document.querySelector(".sim");
+  if(badge) badge.innerHTML='<i style="background:var(--good)"></i>LIVE &middot; Gross Opportunity connected';
+}
+function refreshLive(){
+  var apiBase = typeof window.BISD_TREE!=="undefined" ? findLiveApi(window.BISD_TREE) : null;
+  if(!apiBase) return;
+  fetch(apiBase+"/api/counts?user_id=todd").then(function(r){
+    if(!r.ok) throw new Error(r.status);
+    return r.json();
+  }).then(function(c){
+    _liveCounts=c; applyLive();
+  }).catch(function(){/* keep simulated fallback numbers */});
+}
+refreshLive();
+setInterval(refreshLive, 30000);
+
+// ── Full-screen console modal ── "Open →" opens the deployed console in place.
+var _modal=document.getElementById("consoleModal"),
+    _frame=document.getElementById("consoleFrame"),
+    _loading=document.getElementById("consoleLoading");
+function openConsole(url){
+  document.getElementById("consoleUrl").textContent=url;
+  document.getElementById("consoleNewTab").href=url;
+  _loading.style.display="flex";
+  _frame.src=url;
+  _modal.classList.add("open");
+  _modal.setAttribute("aria-hidden","false");
+  document.body.style.overflow="hidden";
+}
+function closeConsole(){
+  _modal.classList.remove("open");
+  _modal.setAttribute("aria-hidden","true");
+  _frame.src="about:blank";   // stop the console's polling while hidden
+  document.body.style.overflow="";
+  refreshLive();              // reflect any review actions on the card counts
+}
+_frame.addEventListener("load",function(){ if(_frame.src!=="about:blank") _loading.style.display="none"; });
+document.getElementById("consoleClose").addEventListener("click",closeConsole);
+_modal.addEventListener("click",function(e){ if(e.target===_modal) closeConsole(); });
+document.addEventListener("keydown",function(e){ if(e.key==="Escape"&&_modal.classList.contains("open")) closeConsole(); });
+document.addEventListener("click",function(e){
+  var a=e.target.closest("a.openconsole");
+  if(!a) return;
+  e.preventDefault(); e.stopPropagation();
+  openConsole(a.dataset.console||a.href);
+});
+
 document.getElementById("expandAll").addEventListener("click",function(){
   document.querySelectorAll("#tree ul.collapsed").forEach(function(u){u.classList.remove("collapsed");});
   document.querySelectorAll("#tree .node.branch .exp").forEach(function(e){
@@ -201,6 +300,6 @@ document.getElementById("expandAll").addEventListener("click",function(){
     if(ul) setExp(e,true,ul.children.length);
   });
 });
-document.getElementById("collapseAll").addEventListener("click", build);
+document.getElementById("collapseAll").addEventListener("click", function(){build();applyLive();});
 </script>
 </body></html>

@@ -23,6 +23,12 @@ build/
 !**/package.json
 !**/tsconfig.json
 !**/memory-schema.json
+# Agent runtime configs are versioned core artifacts (vendor-neutral, no secrets):
+# the Config Registry (engines.json) and source configs. Never put credentials in
+# these files — secrets live in .env (ignored) / GCP Secret Manager.
+!agents/*/config/*.json
+!agents/*/config/sources/*.json
+!**/tool-registry.json
 
 # JSONL
 trust-ledger.jsonl

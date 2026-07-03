@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gross Opportunity Agent — Console</title>
+<style>
+:root{
+  --paper:#E7ECF2;--card:#F5F8FC;--card2:#EEF3F8;--ink:#1B2733;--muted:#566476;--faint:#8B9AAD;
+  --line:#C7D2DE;--rail:#DCE3EC;--agent:#3B6EA5;--agent-bg:#E4ECF5;--people:#8A7356;
+  --good:#2F8F6B;--good-bg:#DCEFE6;--watch:#B0852B;--watch-bg:#F5EBD3;--risk:#B0493A;--risk-bg:#F3DDD8;
+  --ui:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,'Consolas',Menlo,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:linear-gradient(180deg,#EDF1F6,var(--paper));color:var(--ink);font-family:var(--ui);font-size:14px;-webkit-font-smoothing:antialiased;height:100%}
+body{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+.top{display:flex;align-items:center;gap:14px;padding:11px 18px;border-bottom:1px solid var(--line);background:#F5F8FCdd;flex-shrink:0}
+.top .mark{width:30px;height:30px;border-radius:5px;background:var(--agent);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:12px}
+.top h1{font-size:15px;font-weight:800;letter-spacing:-.2px;margin:0}
+.top .crumb{font-size:11px;color:var(--muted)}
+.spacer{flex:1}
+.tabs{display:flex;gap:4px}
+.tab{font-size:12.5px;font-weight:600;padding:6px 13px;border-radius:6px;cursor:pointer;color:var(--muted);border:1px solid transparent}
+.tab.active{background:var(--agent-bg);color:var(--agent);border-color:#c3d5ea}
+.toggle{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:5px;cursor:pointer;user-select:none}
+.counts{display:flex;gap:8px}
+.count{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:4px 9px;text-align:center;min-width:48px}
+.count b{display:block;font-size:14px;font-variant-numeric:tabular-nums}
+.count span{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.view{flex:1;overflow:hidden;display:none}
+.view.active{display:flex}
+/* Queue view */
+.list{flex:1;overflow-y:auto;padding:12px 14px;min-width:0}
+.detail{width:460px;border-left:1px solid var(--line);background:var(--card);overflow-y:auto;padding:18px;flex-shrink:0}
+.row{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:11px 13px;margin-bottom:8px;cursor:pointer;transition:border-color .12s}
+.row:hover{border-color:var(--agent)}
+.row.sel{border-color:var(--agent);box-shadow:0 0 0 1px var(--agent)}
+.row .r1{display:flex;align-items:baseline;gap:8px}
+.row .name{font-weight:700;font-size:13px;flex:1}
+.badge{font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:4px;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap}
+.badge.new{background:var(--agent-bg);color:var(--agent)}
+.badge.seen{background:var(--rail);color:var(--muted)}
+.badge.keep{background:var(--good-bg);color:var(--good)}
+.badge.drop{background:var(--risk-bg);color:var(--risk)}
+.row .meta{font-size:11px;color:var(--muted);margin-top:4px;display:flex;gap:11px;flex-wrap:wrap}
+.score{font-family:var(--mono);font-size:11px;font-weight:600}
+.detail h2{font-size:15px;margin:0 0 4px;line-height:1.3}
+.detail .sub{font-size:11.5px;color:var(--muted);margin-bottom:14px;word-break:break-all}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px 14px}
+.field label{display:block;font-size:9.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--faint);margin-bottom:1px}
+.field .v{font-size:12.5px}
+.field .v a{color:var(--agent)}
+.klabel{font-family:var(--mono);font-size:9px;color:var(--agent);background:var(--agent-bg);padding:0 3px;border-radius:3px;display:none}
+.show-keys .klabel{display:inline-block}
+.sechead{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin:16px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--line)}
+/* Pipeline steps */
+.pipe{display:flex;flex-direction:column;gap:0}
+.step{display:flex;gap:10px;position:relative;padding-bottom:14px}
+.step:not(:last-child):before{content:'';position:absolute;left:11px;top:24px;bottom:0;width:2px;background:var(--rail)}
+.step .dot{width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;z-index:1}
+.dot.ok{background:var(--good)}.dot.info{background:var(--agent)}.dot.drop{background:var(--risk)}.dot.model{background:var(--people)}
+.step .body{flex:1;min-width:0}
+.step .t{font-size:12.5px;font-weight:700}
+.step .d{font-size:11.5px;color:var(--muted);margin-top:2px;line-height:1.45}
+.step .d code{font-family:var(--mono);font-size:10.5px;background:var(--card2);padding:0 4px;border-radius:3px}
+.reason{background:var(--card2);border-left:3px solid var(--people);padding:7px 10px;border-radius:0 5px 5px 0;font-size:11.5px;color:var(--ink);margin-top:6px;font-style:italic}
+.fetchstate{font-family:var(--mono);font-size:10.5px;padding:2px 7px;border-radius:4px}
+.fs-summary{background:var(--rail);color:var(--muted)}.fs-pulling{background:var(--agent-bg);color:var(--agent)}
+.fs-full_pulled{background:var(--good-bg);color:var(--good)}.fs-failed{background:var(--risk-bg);color:var(--risk)}
+.actions{margin-top:16px;display:flex;gap:8px;flex-wrap:wrap}
+button{font-family:var(--ui);font-size:12px;font-weight:600;border:1px solid var(--line);background:var(--card2);color:var(--ink);border-radius:6px;padding:7px 12px;cursor:pointer}
+button:hover{border-color:var(--agent)}button:disabled{opacity:.5;cursor:default}
+button.primary{background:var(--agent);color:#fff;border-color:var(--agent)}
+button.risk{color:var(--risk);border-color:#e0b9b2}
+.full-report{margin-top:8px;background:var(--card2);border:1px solid var(--line);border-radius:6px;padding:10px;font-family:var(--mono);font-size:10.5px;white-space:pre-wrap;word-break:break-word;max-height:280px;overflow:auto}
+.empty{color:var(--muted);text-align:center;padding:40px;font-size:13px}
+/* Stats view */
+.stats{flex:1;overflow-y:auto;padding:20px 24px}
+.statgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-bottom:22px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px 16px}
+.stat b{display:block;font-size:26px;font-variant-numeric:tabular-nums;letter-spacing:-.5px}
+.stat span{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+.stat.good b{color:var(--good)}.stat.risk b{color:var(--risk)}.stat.agent b{color:var(--agent)}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:16px;margin-bottom:16px}
+.panel h3{margin:0 0 12px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
+.bar{display:flex;align-items:center;gap:10px;margin-bottom:7px}
+.bar .lbl{width:150px;font-size:12px;flex-shrink:0;text-align:right;color:var(--muted)}
+.bar .track{flex:1;background:var(--rail);border-radius:4px;height:18px;overflow:hidden}
+.bar .fill{height:100%;background:var(--agent);border-radius:4px}
+.bar .n{width:36px;font-family:var(--mono);font-size:11px;text-align:right}
+.funnel{display:flex;gap:0;align-items:stretch;margin-bottom:4px}
+.fstage{flex:1;text-align:center;padding:14px 8px;border-right:2px solid var(--paper);background:var(--agent-bg)}
+.fstage:last-child{border-right:none}
+.fstage b{display:block;font-size:22px;font-variant-numeric:tabular-nums}
+.fstage span{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.dcols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+/* Activity feed */
+.actwrap{flex:1;display:flex;flex-direction:column;min-width:0}
+.actbar{display:flex;align-items:center;gap:10px;padding:8px 18px;border-bottom:1px solid var(--line);background:var(--card)}
+.actstatus{font-size:11.5px;font-weight:700;color:var(--good)}
+.actstatus.paused{color:var(--muted)}
+.acthint{font-size:11px;color:var(--muted)}
+.actfeed{flex:1;overflow-y:auto;padding:8px 0;font-family:var(--mono);font-size:12px}
+.evt{display:flex;gap:10px;align-items:baseline;padding:5px 18px;border-bottom:1px solid #eef2f7}
+.evt:hover{background:var(--card)}
+.evt .t{color:var(--faint);font-size:10.5px;white-space:nowrap;width:62px;flex-shrink:0}
+.evt .st{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;width:74px;flex-shrink:0;padding:1px 6px;border-radius:4px;text-align:center}
+.st-pull,.st-run{background:var(--agent-bg);color:var(--agent)}
+.st-normalize{background:var(--rail);color:var(--muted)}
+.st-dedup{background:#e9e2f2;color:#6b4fa0}
+.st-gate{background:var(--watch-bg);color:var(--watch)}
+.st-commit{background:var(--good-bg);color:var(--good)}
+.st-error,.st-warn{background:var(--risk-bg);color:var(--risk)}
+.st-scout,.st-watchdog{background:#e2eef2;color:#3a7a8a}
+.evt .m{flex:1;color:var(--ink);word-break:break-word;line-height:1.4}
+.evt.lvl-good .m{color:var(--good)}
+.evt.lvl-drop .m{color:var(--risk)}
+.evt.lvl-warn .m{color:var(--risk)}
+.evt .rid{color:var(--faint);font-size:10px;flex-shrink:0}
+.evt .ag{font-size:9.5px;color:var(--people);width:82px;flex-shrink:0;text-transform:uppercase;letter-spacing:.3px;text-align:right}
+.st-budget{background:#e2eef2;color:#3a7a8a}
+.st-fetch_full{background:var(--agent-bg);color:var(--agent)}
+/* Agent Swarm view */
+.agentswrap{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.budgetbar{display:flex;gap:18px;align-items:center;padding:9px 18px;border-bottom:1px solid var(--line);background:var(--card);flex-wrap:wrap}
+.budgetbar .btitle{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
+.bmeter{display:flex;align-items:center;gap:8px;font-size:11.5px}
+.bmeter .track{width:150px;height:10px;background:var(--rail);border-radius:5px;overflow:hidden}
+.bmeter .bfill{height:100%;background:var(--good);border-radius:5px}
+.bmeter .bfill.warn{background:var(--watch)}.bmeter .bfill.full{background:var(--risk)}
+.bmeter .lab{font-family:var(--mono);font-size:10.5px}
+.bnote{font-size:10.5px;color:var(--muted)}
+.agentgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(252px,1fr));gap:10px;padding:13px 18px;overflow-y:auto;flex:1}
+.acard{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px 14px;cursor:pointer;transition:border-color .12s}
+.acard:hover{border-color:var(--agent)}.acard.sel{border-color:var(--agent);box-shadow:0 0 0 1px var(--agent)}
+.acard .ahead{display:flex;align-items:center;gap:8px}
+.acard .aicon{width:26px;height:26px;border-radius:6px;background:var(--agent-bg);color:var(--agent);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.acard .aname{font-weight:800;font-size:12.5px;flex:1}
+.adot{width:8px;height:8px;border-radius:50%;background:var(--faint);flex-shrink:0}
+.adot.working{background:var(--good);box-shadow:0 0 0 3px var(--good-bg);animation:pulse 1.4s infinite}
+.adot.idle{background:var(--watch)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.acard .astatus{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;white-space:nowrap}
+.acard .adoes{font-size:10.8px;color:var(--muted);line-height:1.45;margin:7px 0 8px;min-height:46px}
+.acard .aengine{font-family:var(--mono);font-size:9.5px;background:var(--card2);border:1px solid var(--line);border-radius:4px;padding:2px 6px;display:inline-block;margin-bottom:8px;color:var(--people)}
+.acard .anums{display:flex;gap:14px}
+.acard .anums .nm{font-size:9px;color:var(--faint);text-transform:uppercase;letter-spacing:.4px}
+.acard .anums b{font-variant-numeric:tabular-nums;font-size:13px;display:block}
+.acard .anums .ngood b{color:var(--good)}.acard .anums .ndrop b{color:var(--risk)}
+.acard .alast{font-family:var(--mono);font-size:9.8px;color:var(--faint);margin-top:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-top:1px dashed var(--line);padding-top:6px}
+.agentlog{border-top:1px solid var(--line);height:37%;min-height:150px;display:flex;flex-direction:column;background:var(--card);flex-shrink:0}
+.agentlog .alhead{display:flex;align-items:center;gap:8px;padding:6px 18px;border-bottom:1px solid var(--line);font-size:11.5px;color:var(--muted);flex-shrink:0}
+.agentlog .alfeed{flex:1;overflow-y:auto;font-family:var(--mono);font-size:11.5px}
+</style>
+</head><body>
+<div class="top">
+  <div class="mark">GOA</div>
+  <div>
+    <h1>Gross Opportunity Agent</h1>
+    <div class="crumb">Basco · Installed Sales Division · Danielle's pipeline · Data Contract v1.0</div>
+  </div>
+  <div class="spacer"></div>
+  <div class="tabs">
+    <div class="tab active" data-view="queue">Review Queue</div>
+    <div class="tab" data-view="agents">Agent Swarm</div>
+    <div class="tab" data-view="activity">Live Activity</div>
+    <div class="tab" data-view="stats">Pipeline Stats</div>
+  </div>
+  <div class="spacer"></div>
+  <div class="counts" id="counts"></div>
+  <label class="toggle"><input type="checkbox" id="showKeys"> keys</label>
+</div>
+
+<!-- QUEUE VIEW -->
+<div class="view active" id="view-queue">
+  <div class="list" id="list"><div class="empty">Loading…</div></div>
+  <div class="detail" id="detail"><div class="empty">Select an opportunity to see its RFP detail and the agent's decision trail.</div></div>
+</div>
+
+<!-- AGENT SWARM VIEW -->
+<div class="view" id="view-agents">
+  <div class="agentswrap">
+    <div class="budgetbar" id="budgetbar"><span class="btitle">API request budget</span><span class="bnote">loading…</span></div>
+    <div class="agentgrid" id="agentgrid"><div class="empty">Loading agents…</div></div>
+    <div class="agentlog">
+      <div class="alhead">
+        <b id="alTitle">All agents</b>
+        <span id="alHint">— click an agent card to filter to that agent's own log</span>
+        <span style="flex:1"></span>
+        <button id="alClear" style="font-size:10.5px;padding:3px 9px">Show all</button>
+      </div>
+      <div class="alfeed" id="alfeed"><div class="empty">No agent activity yet.</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ACTIVITY VIEW -->
+<div class="view" id="view-activity">
+  <div class="actwrap">
+    <div class="actbar">
+      <span id="actStatus" class="actstatus">● live</span>
+      <span class="spacer" style="flex:1"></span>
+      <span class="acthint">Streaming agent steps from the pipeline · run a backfill to see it work</span>
+    </div>
+    <div class="actfeed" id="actfeed"><div class="empty">No activity yet. Run <code>scripts/run_backfill.sh</code> and watch the agent work here.</div></div>
+  </div>
+</div>
+
+<!-- STATS VIEW -->
+<div class="view" id="view-stats">
+  <div class="stats" id="stats"><div class="empty">Loading stats…</div></div>
+</div>
+
+<dialog id="rejectDlg">
+  <h2 style="margin:0 0 8px;font-size:15px">Reject opportunity</h2>
+  <textarea id="rejReason" style="width:100%;min-height:60px;font-family:var(--ui);border:1px solid var(--line);border-radius:6px;padding:8px;margin:8px 0" placeholder="Reason (why is this out of scope?)"></textarea>
+  <label style="display:flex;gap:6px;align-items:center;font-size:12.5px;margin:4px 0"><input type="radio" name="rejScope" value="one_time" checked> One-time (this record only)</label>
+  <label style="display:flex;gap:6px;align-items:center;font-size:12.5px;margin:4px 0"><input type="radio" name="rejScope" value="permanent"> Permanent (write a screening rule)</label>
+  <div class="actions"><button class="risk" id="rejConfirm">Reject</button><button onclick="rejectDlg.close()">Cancel</button></div>
+</dialog>
+
+<script>
+const USER_ID = new URLSearchParams(location.search).get('user') || 'todd';
+let state = { rows: [], counts: {}, selected: null };
+
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  if (!r.ok) throw new Error(`${path} -> ${r.status}`);
+  return r.status === 204 ? null : r.json();
+}
+function post(b){return {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(b)}}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function score(s){return s==null?'—':Number(s).toFixed(2)}
+function jarr(v){try{return Array.isArray(v)?v:JSON.parse(v||'[]')}catch(e){return []}}
+function jobj(v){try{return typeof v==='string'?JSON.parse(v):(v||{})}catch(e){return {}}}
+function scoreColor(s){return s==null?'var(--muted)':(s>=.6?'var(--good)':s>=.4?'var(--watch)':'var(--risk)')}
+
+// ── tabs ──
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>switchTab(t.dataset.view));
+
+// ── live activity feed ──
+let actSince=0, actTimer=null, actRows=[];
+function fmtTime(iso){try{return new Date(iso).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'})}catch(e){return ''}}
+function renderActivity(){
+  const feed=document.getElementById('actfeed');
+  if(!actRows.length){feed.innerHTML='<div class="empty">No activity yet. Run <code>scripts/run_backfill.sh</code> and watch the agent work here.</div>';return}
+  feed.innerHTML=actRows.map(evtHTML).join('');
+  feed.scrollTop=feed.scrollHeight;
+}
+function evtHTML(e){
+  return `<div class="evt lvl-${esc(e.level)}">
+      <span class="t">${fmtTime(e.ts)}</span>
+      <span class="ag">${esc(e.agent||'')}</span>
+      <span class="st st-${esc(e.step)}">${esc(e.step)}</span>
+      <span class="m">${esc(e.message)}</span>
+      ${e.run_id?`<span class="rid">#${esc(e.run_id)}</span>`:''}
+    </div>`;
+}
+async function pollActivity(){
+  try{
+    const evs=await api(`/api/activity?since_id=${actSince}&limit=200`);
+    if(evs.length){
+      actRows.push(...evs);
+      if(actRows.length>500) actRows=actRows.slice(-500);
+      actSince=Math.max(actSince, ...evs.map(e=>e.id));
+      renderActivity();
+    }
+    document.getElementById('actStatus').className='actstatus';
+    document.getElementById('actStatus').textContent='● live';
+  }catch(e){
+    const s=document.getElementById('actStatus'); s.className='actstatus paused'; s.textContent='● disconnected';
+  }
+}
+function startActivity(){
+  if(actTimer) return;
+  // seed with recent history (last 200), then poll for new
+  actSince=0; actRows=[];
+  pollActivity();
+  actTimer=setInterval(pollActivity, 1500);
+}
+function stopActivity(){ if(actTimer){clearInterval(actTimer);actTimer=null} }
+document.getElementById('showKeys').addEventListener('change',e=>document.body.classList.toggle('show-keys',e.target.checked));
+
+// ── agent swarm view ──
+let agTimer=null, agSelected=null, agSince=0, agRows=[];
+const STATUS_LABEL={working:'working now',idle:'idle',never_ran:'no runs yet'};
+function fmtAgo(iso){
+  if(!iso) return '';
+  const s=Math.max(0,(Date.now()-new Date(iso).getTime())/1000);
+  if(s<60) return Math.round(s)+'s ago';
+  if(s<3600) return Math.round(s/60)+'m ago';
+  if(s<86400) return Math.round(s/3600)+'h ago';
+  return Math.round(s/86400)+'d ago';
+}
+async function loadBudget(){
+  try{
+    const rows=await api('/api/budget');
+    const el=document.getElementById('budgetbar');
+    if(!rows.length){el.innerHTML='<span class="btitle">API request budget</span><span class="bnote">no sources registered</span>';return}
+    el.innerHTML='<span class="btitle">API request budget</span>'+rows.map(b=>{
+      if(!b.requests_per_day) return `<div class="bmeter"><span class="lab">${esc(b.name)}: ${b.used_today} used · no daily cap</span></div>`;
+      const pct=Math.min(100,Math.round(b.used_today/b.requests_per_day*100));
+      const cls=pct>=100?'full':pct>=70?'warn':'';
+      return `<div class="bmeter"><span class="lab"><b>${esc(b.name)}</b></span>
+        <div class="track"><div class="bfill ${cls}" style="width:${pct}%"></div></div>
+        <span class="lab">${b.used_today}/${b.requests_per_day} today${b.override_env?' (env override)':''}</span></div>`;
+    }).join('')+`<span class="bnote">runs stop at the budget line — the source never sees a 429 · resets 00:00 UTC · ${rows[0]&&rows[0].reserve_for_ui?rows[0].reserve_for_ui+' held back for console full-pulls':''}</span>`;
+  }catch(e){/* keep last */}
+}
+async function loadAgents(){
+  try{
+    const agents=await api('/api/agents');
+    const el=document.getElementById('agentgrid');
+    el.innerHTML=agents.map(a=>{
+      const eng=a.engine?`<span class="aengine">${esc(a.engine.role)} → ${esc(a.engine.version||'?')}${a.engine.effort?' · '+esc(a.engine.effort):''}${a.engine.overridden?' (local override)':''}</span>`:'';
+      return `<div class="acard ${agSelected===a.agent_id?'sel':''}" data-agent="${esc(a.agent_id)}">
+        <div class="ahead"><div class="aicon">${a.icon}</div><div class="aname">${esc(a.name)}</div>
+          <span class="adot ${esc(a.status)}"></span><span class="astatus">${STATUS_LABEL[a.status]||''}</span></div>
+        <div class="adoes">${esc(a.does)}</div>
+        ${eng}
+        <div class="anums">
+          <div><b>${a.events_today}</b><span class="nm">today</span></div>
+          <div><b>${a.events_total}</b><span class="nm">all time</span></div>
+          <div class="ngood"><b>${a.good_total}</b><span class="nm">good</span></div>
+          <div class="ndrop"><b>${a.drop_total+a.warn_total}</b><span class="nm">drop/warn</span></div>
+        </div>
+        ${a.last_message?`<div class="alast" title="${esc(a.last_message)}">${fmtAgo(a.last_ts)} · ${esc(a.last_message)}</div>`:''}
+      </div>`;
+    }).join('');
+    el.querySelectorAll('.acard').forEach(c=>c.onclick=()=>selectAgent(c.dataset.agent));
+  }catch(e){/* keep last */}
+}
+function selectAgent(id){
+  agSelected=(agSelected===id)?null:id;
+  document.getElementById('alTitle').textContent=agSelected?agSelected+' — agent log':'All agents';
+  document.getElementById('alHint').textContent=agSelected?'':'— click an agent card to filter to that agent\'s own log';
+  agSince=0;agRows=[];
+  document.getElementById('alfeed').innerHTML='<div class="empty">Loading…</div>';
+  document.querySelectorAll('.acard').forEach(c=>c.classList.toggle('sel',c.dataset.agent===agSelected));
+  pollAgentLog();
+}
+document.getElementById('alClear').onclick=()=>{if(agSelected)selectAgent(agSelected)};
+async function pollAgentLog(){
+  try{
+    const q=agSelected?`&agent=${encodeURIComponent(agSelected)}`:'';
+    const evs=await api(`/api/activity?since_id=${agSince}&limit=200${q}`);
+    if(evs.length){
+      agRows.push(...evs);
+      if(agRows.length>500) agRows=agRows.slice(-500);
+      agSince=Math.max(agSince,...evs.map(e=>e.id));
+      const feed=document.getElementById('alfeed');
+      feed.innerHTML=agRows.map(evtHTML).join('');
+      feed.scrollTop=feed.scrollHeight;
+    } else if(!agRows.length){
+      document.getElementById('alfeed').innerHTML='<div class="empty">No activity yet for this agent.</div>';
+    }
+  }catch(e){}
+}
+function startAgents(){
+  if(agTimer) return;
+  loadBudget();loadAgents();pollAgentLog();
+  agTimer=setInterval(()=>{loadBudget();loadAgents();pollAgentLog()},2500);
+}
+function stopAgents(){ if(agTimer){clearInterval(agTimer);agTimer=null} }
+
+// ── counts ──
+async function loadCounts(){
+  state.counts = await api(`/api/counts?user_id=${encodeURIComponent(USER_ID)}`);
+  const c=state.counts;
+  document.getElementById('counts').innerHTML=[['new_count','New'],['seen_count','Seen'],['total_active','Active'],['rejected_count','Rej'],['closed_count','Closed']]
+    .map(([k,l])=>`<div class="count"><b>${c[k]??'–'}</b><span>${l}</span></div>`).join('');
+}
+
+// ── queue ──
+async function loadList(){
+  state.rows = await api(`/api/opportunities?user_id=${encodeURIComponent(USER_ID)}&status=active`);
+  renderList();
+}
+function renderList(){
+  const el=document.getElementById('list');
+  if(!state.rows.length){el.innerHTML='<div class="empty">No active opportunities.<br>Run a backfill: <code>python -m jobs.backfill --source sam_gov</code></div>';return}
+  el.innerHTML=state.rows.map(r=>{
+    const kept=r.gate_passed;
+    return `<div class="row ${state.selected===r.opportunity_id?'sel':''}" data-id="${r.opportunity_id}">
+      <div class="r1">
+        <span class="name">${esc(r.project_name||'Unnamed')}</span>
+        <span class="badge ${r.seen_state}">${r.seen_state}</span>
+        <span class="badge ${kept?'keep':'drop'}">${kept?'kept':'flagged'}</span>
+        <span class="score" style="color:${scoreColor(r.gate_score)}">${score(r.gate_score)}</span>
+      </div>
+      <div class="meta">
+        <span>${esc(r.city||'')}${r.state?', '+esc(r.state):''}</span>
+        <span>${esc(r.record_type||'')}</span>
+        <span>CSI ${jarr(r.csi_divisions).join('/')||'—'}</span>
+        <span>${r.bid_date?('bid '+r.bid_date):''}</span>
+        <span>${(r.source_links||[]).length} src</span>
+      </div></div>`;
+  }).join('');
+  el.querySelectorAll('.row').forEach(row=>row.onclick=()=>select(row.dataset.id,'opened'));
+}
+
+async function select(id,via){
+  state.selected=id; renderList();
+  try{await api('/api/seen',post({opportunity_id:id,user_id:USER_ID,via}))}catch(e){}
+  const d=await api(`/api/opportunities/${id}`);
+  renderDetail(d); loadCounts();
+}
+
+function pipelineHTML(d){
+  const t=jobj(d.agent_trace);
+  if(!t.normalize && !t.gate) return '<div class="d" style="color:var(--muted)">No trace recorded for this record.</div>';
+  const nz=t.normalize||{}, dd=t.dedup||{}, g=t.gate||{};
+  const steps=[];
+  steps.push({cls:'info',n:'1',t:'Connector — pulled from source',d:`${esc(d.source_links?.[0]?.source_name||'source')} · record <code>${esc(d.source_links?.[0]?.source_record_id||'')}</code>`});
+  steps.push({cls:'info',n:'2',t:'Normalizer — canonical shape',d:`type <code>${esc(nz.record_type||d.record_type)}</code> · CSI <code>${(nz.csi_divisions||[]).join('/')||'—'}</code> · identity key <code>${esc(nz.identity_key||'')}</code>`});
+  const ddDrop = dd.result==='merged';
+  steps.push({cls:ddDrop?'ok':'info',n:'3',t:`Dedup — ${dd.result==='merged'?'merged into existing':'new project'}`,d:`method <code>${esc(dd.method||'—')}</code> · ${dd.candidates||0} candidate(s) examined`});
+  const gk=g.passed;
+  let gd=`${g.matched_rules&&g.matched_rules.length?('rules '+g.matched_rules.map(r=>`<code>${esc(r)}</code>`).join(' ')):'no deterministic rule fired'}`;
+  gd += g.used_classifier ? ` · consulted <b>model</b> (${esc(g.classifier_engine||'')})` : ' · deterministic only';
+  steps.push({cls:gk?'ok':'drop',n:'4',t:`Coarse gate — ${gk?'KEPT (recall-first)':'flagged / dropped'} · score ${score(g.score)}`,d:gd,reason:g.classifier_reason});
+  return '<div class="pipe">'+steps.map(s=>`
+    <div class="step"><div class="dot ${s.cls}">${s.n}</div>
+      <div class="body"><div class="t">${s.t}</div><div class="d">${s.d}</div>
+      ${s.reason?`<div class="reason">🧠 ${esc(s.reason)}</div>`:''}</div></div>`).join('')+'</div>';
+}
+
+function renderDetail(d){
+  const el=document.getElementById('detail');
+  if(!d){el.innerHTML='<div class="empty">Not found.</div>';return}
+  const fs=d.fetch_state||'summary';
+  const url=d.primary_source_url;
+  el.innerHTML=`
+    <h2>${esc(d.project_name||'Unnamed project')}</h2>
+    <div class="sub"><span class="klabel">opportunity_id</span> ${esc(d.opportunity_id)}</div>
+    <div class="grid2">
+      <div class="field"><label>owner <span class="klabel">owner</span></label><div class="v">${esc(d.owner||'—')}</div></div>
+      <div class="field"><label>record_type</label><div class="v">${esc(d.record_type||'—')} / ${esc(d.stage||'')}</div></div>
+      <div class="field"><label>location</label><div class="v">${esc([d.city,d.state,d.postal_code].filter(Boolean).join(', ')||'—')}</div></div>
+      <div class="field"><label>bid_date</label><div class="v">${esc(d.bid_date||'—')}</div></div>
+      <div class="field"><label>valuation</label><div class="v">${d.valuation?('$'+Number(d.valuation).toLocaleString()):'—'}</div></div>
+      <div class="field"><label>csi_divisions</label><div class="v">${jarr(d.csi_divisions).join(', ')||'—'}</div></div>
+    </div>
+    <div class="field" style="margin-top:8px"><label>source link</label><div class="v">${url?`<a href="${esc(url)}" target="_blank">${esc(url)}</a>`:'—'}</div></div>
+
+    <div class="sechead">Agent decision trail <span class="klabel">agent_trace</span></div>
+    ${pipelineHTML(d)}
+
+    <div class="sechead">Full RFP report</div>
+    <div class="field"><label>fetch_state <span class="klabel">fetch_state</span></label>
+      <span class="fetchstate fs-${fs}">${fs}</span></div>
+    <div class="actions">
+      <button class="primary" id="btnFull" ${fs==='pulling'?'disabled':''}>${d.full_record?'Re-pull full report':'Pull full report from SAM.gov'}</button>
+    </div>
+    ${d.full_record?`<div class="full-report">${esc(JSON.stringify(jobj(d.full_record),null,2))}</div>`:''}
+
+    <div class="sechead">Reviewer actions</div>
+    <div class="actions">
+      <button class="risk" id="btnReject">Reject</button>
+      <button id="btnReopen">Reopen</button>
+    </div>`;
+  document.getElementById('btnFull').onclick=()=>pullFull(d.opportunity_id);
+  document.getElementById('btnReject').onclick=()=>openReject(d.opportunity_id);
+  document.getElementById('btnReopen').onclick=()=>reopen(d.opportunity_id);
+}
+
+async function pullFull(id){
+  await api(`/api/opportunities/${id}/full_report`,post({}));
+  const tick=async()=>{const d=await api(`/api/opportunities/${id}`);renderDetail(d);if(d.fetch_state==='pulling')setTimeout(tick,1500)};
+  setTimeout(tick,1200);
+}
+function openReject(id){
+  document.getElementById('rejReason').value='';
+  const dlg=document.getElementById('rejectDlg');dlg.showModal();
+  document.getElementById('rejConfirm').onclick=async()=>{
+    const reason=document.getElementById('rejReason').value.trim();
+    const scope=document.querySelector('input[name=rejScope]:checked').value;
+    await api('/api/reject',post({opportunity_id:id,user_id:USER_ID,reason_text:reason,rule_scope:scope}));
+    dlg.close();await loadList();await loadCounts();
+    document.getElementById('detail').innerHTML='<div class="empty">Rejected. Select another.</div>';
+  };
+}
+async function reopen(id){await api('/api/reopen',post({opportunity_id:id}));await loadList();await loadCounts();select(id,'opened')}
+
+// ── stats ──
+async function loadStats(){
+  const el=document.getElementById('stats');
+  try{
+    const s=await api('/api/stats'); const t=s.totals;
+    const bar=(items,max,color)=>items.map(i=>`<div class="bar"><div class="lbl">${esc(i.label)}</div><div class="track"><div class="fill" style="width:${max?Math.round(i.n/max*100):0}%;background:${color||'var(--agent)'}"></div></div><div class="n">${i.n}</div></div>`).join('');
+    const stMax=Math.max(1,...s.by_state.map(r=>r.c));
+    const tyMax=Math.max(1,...s.by_record_type.map(r=>r.c));
+    const buckets=[0,0,0,0,0]; s.score_buckets.forEach(b=>{const i=Math.min(4,Math.max(0,(b.b||1)-1));buckets[i]=b.c});
+    const bkMax=Math.max(1,...buckets);
+    el.innerHTML=`
+      <div class="statgrid">
+        <div class="stat"><b>${t.total}</b><span>Total pulled</span></div>
+        <div class="stat good"><b>${t.gate_kept}</b><span>Gate kept</span></div>
+        <div class="stat risk"><b>${t.gate_dropped}</b><span>Gate dropped</span></div>
+        <div class="stat agent"><b>${s.dedup.collapsed}</b><span>Dups collapsed</span></div>
+        <div class="stat"><b>${t.active}</b><span>Active</span></div>
+        <div class="stat"><b>${t.rejected}</b><span>Rejected</span></div>
+        <div class="stat"><b>${t.full_pulled}</b><span>Full reports</span></div>
+      </div>
+      <div class="panel"><h3>Pipeline funnel</h3>
+        <div class="funnel">
+          <div class="fstage"><b>${s.dedup.source_records}</b><span>Source records</span></div>
+          <div class="fstage"><b>${s.dedup.opportunities}</b><span>After dedup</span></div>
+          <div class="fstage" style="background:var(--good-bg)"><b>${t.gate_kept}</b><span>Kept by gate</span></div>
+          <div class="fstage"><b>${t.active-t.rejected>=0?t.active:t.active}</b><span>In review</span></div>
+        </div>
+        <div class="d" style="font-size:11px;color:var(--muted);margin-top:6px">Every stage is real: SAM.gov pull → normalize → dedup (identity key + fuzzy + model) → coarse gate (rules + model, recall-first).</div>
+      </div>
+      <div class="dcols">
+        <div class="panel"><h3>By record type</h3>${bar(s.by_record_type.map(r=>({label:r.record_type,n:r.c})),tyMax)||'<div class="empty">—</div>'}</div>
+        <div class="panel"><h3>Top states</h3>${bar(s.by_state.map(r=>({label:r.state,n:r.c})),stMax,'var(--people)')||'<div class="empty">—</div>'}</div>
+      </div>
+      <div class="panel"><h3>Gate-score distribution (active)</h3>
+        ${bar(['0.0–0.2','0.2–0.4','0.4–0.6','0.6–0.8','0.8–1.0'].map((l,i)=>({label:l,n:buckets[i]})),bkMax,'var(--good)')}</div>
+      <div class="panel"><h3>By source</h3>${bar(s.by_source.map(r=>({label:r.source_name,n:r.c})),Math.max(1,...s.by_source.map(r=>r.c)))||'<div class="empty">—</div>'}</div>`;
+  }catch(e){el.innerHTML=`<div class="empty">Stats error: ${e.message}</div>`}
+}
+
+// window.__screen — automated-testing hook (Data Contract prototype convention)
+window.__screen={get state(){return state},reload:async()=>{await Promise.all([loadList(),loadCounts()])},select,pullFull,loadStats,api,loadAgents,loadBudget,selectAgent,switchTab};
+
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x.dataset.view===name));
+  document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
+  document.getElementById('view-'+name).classList.add('active');
+  if(name==='stats') loadStats();
+  if(name==='activity') startActivity(); else stopActivity();
+  if(name==='agents') startAgents(); else stopAgents();
+}
+
+// Apply deep-link tab immediately (before data loads) so ?tab=agents|activity|stats lands right.
+const _q=new URLSearchParams(location.search);
+if(['stats','activity','agents'].includes(_q.get('tab'))) switchTab(_q.get('tab'));
+
+(async()=>{
+  try{
+    await Promise.all([loadList(),loadCounts()]);
+    const opp=_q.get('opp');
+    if(opp) await select(opp==='first' && state.rows[0] ? state.rows[0].opportunity_id : opp,'opened');
+  }catch(e){document.getElementById('list').innerHTML=`<div class="empty">API error: ${e.message}<br>Is the Events API up and Cloud SQL reachable?</div>`}
+})();
+</script>
+</body></html>

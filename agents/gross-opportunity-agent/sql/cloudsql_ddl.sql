@@ -27,6 +27,7 @@ CREATE TABLE opportunity (
   fetch_state           TEXT NOT NULL DEFAULT 'summary',    -- summary, pulling, full_pulled, failed
   fetch_error           JSONB,                              -- {code, message, failed_at} or null
   full_record           JSONB,                              -- present after a successful pull
+  agent_trace           JSONB,                              -- per-record pipeline trace (normalize/dedup/gate steps)
   first_seen_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
   last_changed_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -120,6 +121,36 @@ CREATE TABLE watermark (
   source_id    TEXT PRIMARY KEY REFERENCES source_registry(source_id),
   last_cursor  TEXT,
   last_run_at  TIMESTAMPTZ
+);
+
+-- Agent activity feed — one row per pipeline step, for the live "what the agent is
+-- doing" panel in the console. Written by the orchestrator/jobs; read by /api/activity.
+CREATE TABLE IF NOT EXISTS agent_activity (
+  id             BIGSERIAL PRIMARY KEY,
+  ts             TIMESTAMPTZ NOT NULL DEFAULT now(),
+  run_id         TEXT,
+  source_id      TEXT,
+  step           TEXT NOT NULL,                 -- pull, budget, fetch_full, normalize, dedup, gate, commit, watchdog, scout, error, run
+  level          TEXT NOT NULL DEFAULT 'info',  -- info, good, drop, warn
+  message        TEXT NOT NULL,
+  opportunity_id TEXT,
+  detail         JSONB,
+  agent          TEXT                           -- swarm agent id (goa/agents_meta.py): orchestrator, connector, normalizer, dedup, gate, committer, watchdog, scout
+);
+CREATE INDEX IF NOT EXISTS agent_activity_ts_idx ON agent_activity (id DESC);
+CREATE INDEX IF NOT EXISTS agent_activity_agent_idx ON agent_activity (agent, id DESC);
+-- Migration for instances created before the agent column existed:
+ALTER TABLE agent_activity ADD COLUMN IF NOT EXISTS agent TEXT;
+
+-- Daily API request-budget ledger, one row per (source, UTC day). The orchestrator
+-- reads it before a pull to size the run's request budget (never 429), and the
+-- console shows used/remaining. SAM.gov quota resets 00:00 UTC → keyed on UTC date.
+CREATE TABLE IF NOT EXISTS api_request_ledger (
+  source_id     TEXT NOT NULL,
+  day           DATE NOT NULL,
+  requests_used INT  NOT NULL DEFAULT 0,
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (source_id, day)
 );
 
 -- Idempotency markers. Atomic transaction partner of every opportunity write.

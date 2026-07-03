@@ -1,0 +1,15 @@
+# Upload context for Cloud Build (gcloud run deploy --source / gcloud builds submit).
+# NOTE: this file exists so gcloud does NOT auto-generate one from .gitignore —
+# the repo .gitignore excludes *.json, but the image NEEDS config/engines.json and
+# config/sources/*.json (vendor-neutral engine bindings + source configs).
+.gcloudignore
+.git
+.gitignore
+.venv/
+__pycache__/
+*.pyc
+.env
+*.pem
+tests/
+scripts/
+.dockerignore

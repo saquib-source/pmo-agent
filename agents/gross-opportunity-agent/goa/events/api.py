@@ -39,6 +39,92 @@ async def get_counts(user_id: str) -> dict:
     return await cloudsql.get_counts(user_id)
 
 
+async def get_stats() -> dict:
+    """GET dashboard stats: funnel, dedup rate, breakdowns by state/type/source, score histogram."""
+    return await cloudsql.get_stats()
+
+
+async def get_activity(since_id: int = 0, limit: int = 100, agent: str | None = None) -> list[dict]:
+    """GET the live agent-activity feed (what the agent is doing, per pipeline step).
+    `agent` filters to one swarm agent's own log."""
+    return await cloudsql.get_activity(since_id, limit, agent)
+
+
+async def get_agents() -> list[dict]:
+    """GET the swarm view: every agent's identity, what it does, its engine binding
+    (resolved from the Config Registry — config, never code), live status derived
+    from its last activity, and its counters."""
+    import os
+    from ..agents_meta import AGENTS
+    from ..stores.config_registry import resolve
+    from ..engine.runner import _apply_overrides, _transport
+    from datetime import datetime, timezone
+
+    summaries = {s["agent"]: s for s in await cloudsql.get_agent_summaries()}
+    now = datetime.now(timezone.utc)
+    out = []
+    for a in AGENTS:
+        row = dict(a)
+        s = summaries.get(a["agent_id"], {})
+        row.update({
+            "events_total": s.get("events_total", 0),
+            "events_today": s.get("events_today", 0),
+            "good_total": s.get("good_total", 0),
+            "drop_total": s.get("drop_total", 0),
+            "warn_total": s.get("warn_total", 0),
+            "last_ts": s.get("last_ts"),
+            "last_message": s.get("last_message"),
+            "last_level": s.get("last_level"),
+        })
+        # Live status: 'working' if it logged within the last 2 minutes.
+        status = "never_ran"
+        if row["last_ts"]:
+            age = (now - datetime.fromisoformat(row["last_ts"])).total_seconds()
+            status = "working" if age < 120 else "idle"
+        row["status"] = status
+        # Engine binding (display only; resolution stays runtime config).
+        if a.get("engine_role"):
+            try:
+                binding = _apply_overrides(resolve(a["engine_role"]))
+                row["engine"] = {"role": a["engine_role"], "version": binding.get("version"),
+                                 "effort": binding.get("effort"), "transport": _transport(),
+                                 "overridden": bool(os.environ.get("GOA_ENGINE_OVERRIDE_VERSION"))}
+            except Exception:
+                row["engine"] = {"role": a["engine_role"]}
+        out.append(row)
+    return out
+
+
+async def get_budget() -> list[dict]:
+    """GET today's API request budget per source: quota, used, remaining, reset time.
+    This is how the console proves we can never 429: runs stop at the budget line."""
+    import os
+    from datetime import datetime, timezone, timedelta
+    pool = await cloudsql.get_pool()
+    async with pool.acquire() as conn:
+        sources = await conn.fetch("SELECT source_id, name, enabled FROM source_registry")
+    now = datetime.now(timezone.utc)
+    reset_at = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    out = []
+    for src in sources:
+        rl = await cloudsql.get_source_rate_limit(src["source_id"])
+        env_rpd = os.environ.get("GOA_REQUESTS_PER_DAY")
+        per_day = int(env_rpd) if env_rpd else int(rl.get("requests_per_day") or 0)
+        used = await cloudsql.get_requests_used_today(src["source_id"])
+        out.append({
+            "source_id": src["source_id"],
+            "name": src["name"],
+            "enabled": src["enabled"],
+            "requests_per_day": per_day,          # 0 = unlimited
+            "used_today": used,
+            "remaining": max(0, per_day - used) if per_day else None,
+            "reserve_for_ui": int(rl.get("reserve_for_ui") or 0),
+            "override_env": bool(env_rpd),
+            "resets_at_utc": reset_at.isoformat(),
+        })
+    return out
+
+
 async def open_detail(opportunity_id: str) -> dict | None:
     """Return the detail-surface fields already in the store. No model call."""
     return await cloudsql.get_opportunity(opportunity_id)

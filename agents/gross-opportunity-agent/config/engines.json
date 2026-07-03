@@ -1,0 +1,32 @@
+{
+  "_comment": "Config Registry — resolves each function ROLE to an engine binding at runtime. No vendor/model string ever appears in function code; code calls config_registry.resolve(role). Per Manmeet's confirmed decision (2026-07-01), all four roles bind to claude-fable-5. Transport is Vertex AI (AnthropicVertex, GCP ADC). Editing THIS file is the only place engine choice lives. NOTE: claude-fable-5 requires 30-day data retention (not ZDR) and must be enabled in the project's Vertex Model Garden; if it is not yet enabled the model call surfaces a real Vertex error (no fallback stub).",
+  "_transport": "vertex",
+  "normalizer_extraction": {
+    "family": "fable",
+    "version": "claude-fable-5",
+    "effort": "low",
+    "max_tokens": 1024,
+    "tools": []
+  },
+  "dedup_ambiguous_merge": {
+    "family": "fable",
+    "version": "claude-fable-5",
+    "effort": "medium",
+    "max_tokens": 1024,
+    "tools": []
+  },
+  "gate_classifier": {
+    "family": "fable",
+    "version": "claude-fable-5",
+    "effort": "low",
+    "max_tokens": 1024,
+    "tools": []
+  },
+  "scout_reasoning": {
+    "family": "fable",
+    "version": "claude-fable-5",
+    "effort": "high",
+    "max_tokens": 4096,
+    "tools": ["web_search"]
+  }
+}

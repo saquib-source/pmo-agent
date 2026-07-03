@@ -61,8 +61,11 @@ SUBDEPT_LABELS = {
 PROTO = {
     "publicized-project-aggregation": {
         "alias": "= Gross Opportunity",
-        "link": "https://claude.ai/code/artifact/6e272157-4a4d-45c6-a238-859dd7772b5f",
-        "sim": {"active": 847, "new": 23},   # simulated placeholder metrics
+        # Deployed GOA console (Cloud Run). The chart also live-fetches real counts
+        # from {live_api}/api/counts and falls back to `sim` when unreachable.
+        "link": "https://goa-console-1059272334202.us-central1.run.app/",
+        "live_api": "https://goa-console-1059272334202.us-central1.run.app",
+        "sim": {"active": 847, "new": 23},   # fallback placeholder metrics
     },
 }
 
@@ -94,6 +97,7 @@ def load_specs():
             fn["proto"] = True
             fn["alias"] = p["alias"]
             fn["link"] = p["link"]
+            fn["live_api"] = p.get("live_api")
             fn["sim"] = p["sim"]
         by_subdept.setdefault(subdept_folder, []).append(fn)
 

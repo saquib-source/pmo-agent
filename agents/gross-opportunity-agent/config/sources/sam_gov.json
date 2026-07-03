@@ -1,0 +1,48 @@
+{
+  "_comment": "SAM.gov REST source config. Source-specific values live here, never in adapter code. QUOTA UPGRADE: when the SAM.gov role registration lands (1,000 req/day), change rate_limit.requests_per_day to 1000 (or set env GOA_REQUESTS_PER_DAY=1000 on the Cloud Run job — env wins) and optionally widen query_plan. Then re-run `python -m jobs.seed` to push this config into source_registry.",
+  "source_id": "sam_gov",
+  "name": "SAM.gov",
+  "method": "rest",
+  "base_url": "https://api.sam.gov/opportunities/v2/search",
+  "auth": {
+    "type": "query_key",
+    "param": "api_key",
+    "env_var": "SAM_GOV_API_KEY",
+    "secret_ref": "projects/isr-division-systems-488723/secrets/sam-gov-api-key/versions/latest"
+  },
+  "pagination": {
+    "style": "offset",
+    "offset_param": "offset",
+    "total_field": "totalRecords"
+  },
+  "query_params": {
+    "limit": 1000,
+    "ptype": "o,p,k,r,s"
+  },
+  "query_plan": {
+    "_comment": "Each keyword = 1 search = usually 1 request at limit=1000. Each NAICS code = 1 more search. Budget math: len(keywords)+len(naics) searches/run must fit inside requests_per_day - reserve_for_ui. At 10/day keep <=5 searches; at 1,000/day you can list every keyword and NAICS you want.",
+    "keywords": ["partition", "shower", "restroom renovation"],
+    "naics": [],
+    "_naics_candidates_when_quota_raised": ["238390 Other Building Finishing Contractors (toilet partitions install)", "236220 Commercial and Institutional Building Construction", "332323 Ornamental & Architectural Metal Work Mfg", "238150 Glass and Glazing Contractors (shower doors/enclosures)"]
+  },
+  "watermark_field": null,
+  "rate_limit": {
+    "_comment": "requests_per_day is the SAM.gov quota for this key (free personal key = 10; registered system-account role = 1000). reserve_for_ui requests are held back from scheduled runs so reviewers can always click 'Pull full report' on the console. requests_per_second throttles pacing so bursts never trip the per-second limiter.",
+    "requests_per_second": 1,
+    "requests_per_day": 10,
+    "reserve_for_ui": 2
+  },
+  "field_map": {
+    "project_name": "title",
+    "owner": "fullParentPathName",
+    "valuation": "award.amount",
+    "bid_date": "responseDeadLine",
+    "primary_source_url": "uiLink",
+    "source_record_id": "noticeId",
+    "street": "placeOfPerformance.streetAddress",
+    "city": "placeOfPerformance.city",
+    "state": "placeOfPerformance.state",
+    "postal_code": "placeOfPerformance.zip",
+    "country": "placeOfPerformance.country"
+  }
+}

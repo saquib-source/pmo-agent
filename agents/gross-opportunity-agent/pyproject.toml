@@ -10,10 +10,15 @@ dependencies = [
     "google-cloud-firestore>=2.14",
     "google-cloud-secret-manager>=2.18",
     "google-cloud-aiplatform>=1.48",
+    # Claude on Vertex AI — the runtime engine transport (config/engines.json _transport=vertex)
+    "anthropic[vertex]>=0.40",
+    # Events API HTTP entrypoint (Cloud Run)
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
     # OpenTelemetry — optional, tracing disabled if not installed
     "opentelemetry-sdk>=1.22",
     "opentelemetry-exporter-gcp-trace>=1.5",
-    # ADK — Gap: confirm package name when ADK is published
+    # ADK — Gap: confirm package name when ADK is published (future transport)
     # "google-adk>=0.1",
 ]
 

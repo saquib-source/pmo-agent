@@ -55,7 +55,12 @@ python -m http.server
 
 - All 34 functions are **dormant** (`is_active: false`) until each clears the
   8-phase build pipeline. The chart reflects that state truthfully.
-- Metrics on the prototype cell are **simulated placeholders**, not live data.
+- The Gross Opportunity prototype cell is **live**: its "Open →" opens the
+  deployed console (https://goa-console-1059272334202.us-central1.run.app/) and
+  the active/new numbers are fetched from `/api/counts` every 30s (CORS-enabled
+  GET). The header badge flips SIMULATED → LIVE on first successful fetch; if
+  the API is unreachable the `sim` placeholder numbers stay, so the chart never
+  breaks offline. Configured in `generate_tree.py` → `PROTO[...].live_api`.
 - Design tokens (colors, Inter + IBM Plex Mono) match the Gross Opportunity
   review-screen prototype so the two surfaces read as one system.
 - This is a static visualization. To make it live, replace the generated

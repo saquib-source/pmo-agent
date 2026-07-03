@@ -14,7 +14,7 @@ from typing import Any
 from ..schemas.canonical import Address, CanonicalOpportunity, SourceLink
 from .address import normalize_address_str, normalize_city, normalize_state, normalize_street
 from .csi import extract_csi_divisions
-from ..stores.config_registry import get_version, get_family
+from ..engine import run_role_json
 
 log = logging.getLogger(__name__)
 
@@ -41,13 +41,33 @@ def _parse_date(raw_date: Any) -> date | None:
     return None
 
 
+_EXTRACT_SCHEMA = {
+    "type": "object",
+    "properties": {"value": {"type": ["string", "null"]}},
+    "required": ["value"],
+    "additionalProperties": False,
+}
+
+_EXTRACT_SYSTEM = (
+    "You extract a single field value from a raw commercial-construction opportunity "
+    "record when the deterministic field map could not resolve it. Return only the value, "
+    "normalized. For dates, return ISO-8601 (YYYY-MM-DD). If the value is genuinely not "
+    "present in the record, return null — never guess."
+)
+
+
 def _extraction_model_fill(field: str, text: str) -> Any:
     """Call the extraction model for one field value the field map couldn't resolve.
     Uses config_registry role 'normalizer_extraction' — no vendor string in this code.
-    Gap: wire to ADK model call once the ADK runtime is available.
+    Returns the extracted string, or None on absence/error (deterministic fields win).
     """
-    log.debug("Extraction model called for field=%s (engine=%s %s)", field, get_family("normalizer_extraction"), get_version("normalizer_extraction"))
-    return None  # Stub — returns None until ADK runtime is wired
+    prompt = f"FIELD TO EXTRACT: {field}\n\nRAW RECORD (JSON):\n{text[:6000]}"
+    try:
+        result = run_role_json("normalizer_extraction", _EXTRACT_SYSTEM, prompt, _EXTRACT_SCHEMA)
+        return result.get("value")
+    except Exception as e:
+        log.warning("Extraction model failed for field=%s: %s", field, e)
+        return None
 
 
 def normalize(raw: dict, source_cfg: dict) -> CanonicalOpportunity:
@@ -62,18 +82,22 @@ def normalize(raw: dict, source_cfg: dict) -> CanonicalOpportunity:
 
     project_name = f("project_name") or ""
     owner = f("owner") or ""
+    from .address import _as_text
     valuation_raw = f("valuation")
-    valuation = float(valuation_raw) if valuation_raw not in (None, "", "0") else None
+    try:
+        valuation = float(valuation_raw) if valuation_raw not in (None, "", "0") else None
+    except (TypeError, ValueError):
+        valuation = None
     bid_date = _parse_date(f("bid_date"))
-    primary_source_url = f("primary_source_url") or ""
-    source_record_id = f("source_record_id") or str(raw.get("id", ""))
+    primary_source_url = _as_text(f("primary_source_url"))
+    source_record_id = _as_text(f("source_record_id")) or str(raw.get("id", ""))
 
     address = Address(
         street=normalize_street(f("street")),
         city=normalize_city(f("city")),
         state=normalize_state(f("state")),
-        postal_code=str(f("postal_code") or "").strip(),
-        country=str(f("country") or "US").strip(),
+        postal_code=_as_text(f("postal_code")).strip(),
+        country=(_as_text(f("country")).strip() or "US"),
     )
 
     # CSI extraction: try field map, then keyword extraction from name + any description
