@@ -162,12 +162,12 @@ html,body{background:radial-gradient(1200px 720px at 50% -12%, #101a28 0%, var(-
 .lip[data-ws]{cursor:pointer}
 .lip[data-ws]:hover .door-lab{color:var(--agent)}
 .lip[data-ws]:hover .arrow{color:var(--agent)}
-#ws{position:fixed;inset:0;z-index:120;display:flex;flex-direction:column;justify-content:flex-end;visibility:hidden;pointer-events:none}
+#ws{position:fixed;inset:0;z-index:120;display:flex;flex-direction:column;visibility:hidden;pointer-events:none}
 #ws.open{visibility:visible}
-#ws .scrim{position:absolute;inset:0;background:#05080c80;opacity:0;transition:opacity .28s ease;pointer-events:none}
+#ws .scrim{position:absolute;inset:0;background:#05080cd9;backdrop-filter:blur(2px);opacity:0;transition:opacity .25s ease;pointer-events:none}
 #ws.open .scrim{opacity:1;pointer-events:auto}
-.wsshell{position:relative;height:82vh;display:flex;flex-direction:column;border-radius:10px 10px 0 0;overflow:hidden;background:var(--card);border:1px solid var(--line);border-bottom:0;box-shadow:0 -24px 70px -18px #000;transform:translateY(103%);transition:transform .32s cubic-bezier(.2,.8,.2,1);pointer-events:auto}
-#ws.open .wsshell{transform:translateY(0)}
+.wsshell{position:relative;flex:1;margin:16px;display:flex;flex-direction:column;border-radius:8px;overflow:hidden;background:var(--card);border:1px solid var(--line);box-shadow:0 24px 70px -18px #000;opacity:0;transform:scale(.985) translateY(8px);transition:opacity .25s ease,transform .28s cubic-bezier(.2,.8,.2,1);pointer-events:auto}
+#ws.open .wsshell{opacity:1;transform:none}
 @media (prefers-reduced-motion: reduce){.wsshell{transition:none}#ws .scrim{transition:none}}
 .wshead{display:flex;align-items:center;gap:10px;padding:8px 14px;background:#0e151e;border-bottom:1px solid var(--line);color:var(--ink)}
 .wshead .wsmark{width:24px;height:24px;border-radius:4px;background:var(--agent);color:#0C1118;display:flex;align-items:center;justify-content:center;font-size:8.5px;font-weight:800;flex:0 0 auto}
@@ -197,7 +197,7 @@ html,body{background:radial-gradient(1200px 720px at 50% -12%, #101a28 0%, var(-
 <div id="ws" aria-hidden="true"><div class="scrim" id="wsScrim"></div><div class="wsshell">
   <div class="wshead"><span class="wsmark" id="wsMark">GOA</span><div><div class="wst" id="wsTitle"></div><div class="wss" id="wsUrl"></div></div>
     <span class="sp"></span><a id="wsNew" href="#" target="_blank" rel="noopener">Open in new tab &#8599;</a>
-    <button id="wsClose" title="Back to the surface (Esc)">&#8964; Back to the surface</button></div>
+    <button id="wsClose" title="Back to the surface (Esc)">&#10005; Back to the surface</button></div>
   <div class="wsbody"><div id="wsLoad">loading workspace&hellip;</div><iframe id="wsFrame" title="human workspace" src="about:blank"></iframe></div>
 </div></div>
 <div id="pop"></div>
