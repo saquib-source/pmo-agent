@@ -216,6 +216,8 @@ html,body{background:radial-gradient(1200px 720px at 50% -12%, #101a28 0%, var(-
      label     how the agent is presented (tree keeps the canonical name)
      status    resting run-state: "run" | "idle" | "fault" (tap-to-activate
                flips it live; a reachable console also wakes it)
+     console   URL opened in the in-window panel when the selected card is
+               clicked again (the full console); consoleSub is its header line
      workspace URL the bottom bar opens -- the HUMAN REVIEW WORKSPACE ONLY
                (9.2 review screen), in a slide-up panel over the surface
      workspaceSub  one-line description shown in the panel header
@@ -226,6 +228,8 @@ html,body{background:radial-gradient(1200px 720px at 50% -12%, #101a28 0%, var(-
 window.VALUES={
   "Gross Opportunity Agent Capability":{
     label:"Gross Opportunity Agent",
+    console:"https://goa-console-1059272334202.us-central1.run.app/",
+    consoleSub:"Gross Opportunity console \u00b7 Data Contract v1.0",
     workspace:"https://goa-console-1059272334202.us-central1.run.app/?embed=queue",
     workspaceSub:"human review workspace \u00b7 de-duplicated leads \u00b7 Data Contract v1.0",
     liveApi:"https://goa-console-1059272334202.us-central1.run.app"
@@ -617,7 +621,11 @@ function drawCrumb(){
 /* ---------- interaction ---------- */
 let clickTimer=null;
 function nodeClick(n){ if(clickTimer){ clearTimeout(clickTimer); clickTimer=null; nodeDouble(n); return; } clickTimer=setTimeout(()=>{ clickTimer=null; doSingle(n); },230); }
-function doSingle(n){ navToken++; if(n!==focus){ focus=n; expanded=false; } else { focus=n.parent||null; expanded=false; } render(); }
+function doSingle(n){ navToken++;
+  if(n!==focus){ focus=n; expanded=false; render(); return; }
+  const v=(window.VALUES||{})[n.data.name];
+  if(v&&(v.console||v.workspace)){ openWorkspace(v.label||n.data.name,v.console||v.workspace,v.consoleSub||v.workspaceSub); return; }
+  focus=n.parent||null; expanded=false; render(); }
 function nodeDouble(n){ if(clickTimer){ clearTimeout(clickTimer); clickTimer=null; } navToken++; focus=n; expanded=true; render(); }
 function navTo(n){ navToken++; focus=(n===root?root:n); expanded=false; render(); }
 viewport.addEventListener("click",e=>{ if(e.target.closest&&(e.target.closest(".node")||e.target.closest(".chrome"))) return; navToken++; if(focus){ focus=focus.parent||null; expanded=false; render(); } });
