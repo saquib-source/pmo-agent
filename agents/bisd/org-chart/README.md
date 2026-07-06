@@ -1,68 +1,87 @@
-# BISD Org Chart
+# BISD Operations Surface (org chart)
 
-Interactive org chart of the Basco Installed Sales Division agentic function tree:
+The interactive Basco Installed Sales Division operations surface — the ATOM
+dark-instrument org chart. One self-contained `index.html` (D3 bundled inline):
 
 ```
-Basco
- └─ 4 value-chain stages
-     └─ 9 sub-departments
-         └─ 34 agentic functions   (each a small "dashboard" cell)
+Basco Installed Sales Division           (Subsidiary — incremental revenue)
+ └─ 7 Divisions                          Leadership · Demand Generation ·
+     └─ 78 Departments                   People and Agent Supply · Product and
+         └─ 8 Sub-Departments (Projects) Service Supply · Order Management ·
+             └─ 39 Functions             Infrastructure · Technology and Systems
 ```
 
-Click any node to expand its children; click again to collapse. Leaf cells show
-each function's business object, posture, human gates, skill-mesh size, and runtime
-state (dormant / blocked / prototype). **Publicized Project Aggregation** (the Gross
-Opportunity queue) is the one function with a working review-screen prototype and
-links out to it.
+Every node is a four-state capability widget per the **Agent Operations Widget
+spec v1.0**: minimized → normal → selected → expanded, each a superset of the
+last, over a crown band (name · status), the outcome line with an on-plan /
+behind verdict, the A/P/Σ FTE ledger, the effort band (analyst hours, ops/sec,
+live activity feed), and machinery (roster, model rates, running cost). Views
+blend and tween; navigation is nodes + breadcrumb + the bottom command bar
+(type "take me to opportunity pipeline"). No global menu bar.
 
 ## Files
 
 | File | What it is |
 |---|---|
-| `index.html` | The viewer. Self-contained; reads `tree.data.js`. |
-| `generate_tree.py` | Reads every `agent_spec.yaml` and regenerates the data. Source of truth. |
-| `tree.data.js` | Generated & committed — `window.BISD_TREE = {...}`, consumed by `index.html`. The chart works on a fresh clone with no build step. |
-| `tree.json` | Generated but **git-ignored** (repo ignores `*.json`). Same tree as plain JSON, for wiring into a real app or tests. Run the generator to produce it locally. |
+| `index.html` | The whole surface. Deployed as-is to GCS. |
+| `naming_tree.txt` | Source of truth for the tree — the BISD Business System Naming Tree, 4-space indents. |
+| `generate_data.py` | Rebuilds `window.DATA` inside `index.html` from `naming_tree.txt`. |
 
-## Regenerate after specs change
+The previous spec-driven chart (`generate_tree.py`, `tree.data.js`) is
+superseded; see git history if needed.
 
-```bash
-cd agents/bisd/org-chart
-pip install pyyaml          # one-time
-python generate_tree.py
+## Easy value definitions
+
+All metrics are **simulated, deterministic by node path** (placeholders pending
+9.1 + telemetry). To pin real numbers, edit the `window.VALUES` block near the
+top of `index.html` — keyed by exact node name, every field optional, real
+values drop into the same slots and roll up the tree:
+
+```js
+window.VALUES={
+  "Gross Opportunity Agent Capability":{
+    label:"Gross Opportunity Agent",          // presentation name
+    workspace:"…/?embed=queue",               // bottom bar → human review workspace ONLY
+    liveApi:"https://goa-console-…run.app"    // real counts/roster/feed, polled every 30s
+    // live, target, agents, agentFTE, people, humanFTE, opsRate, costHr, status
+  },
+  // "Basco Installed Sales Division": { topLineYTD: 42000000, bottomPct: 0.25 },
+};
 ```
 
-The chart shape is driven entirely by the specs, **except** two curation layers
-defined at the top of `generate_tree.py`:
+## Gross Opportunity Agent — live wiring (9.1 note applied)
 
-- `STAGES` — how the 9 sub-departments group into the 4 value-chain stages
-  (the specs only carry `sub_department`, not the higher stage grouping).
-- `PROTO` — which function has a live prototype (link + placeholder metrics).
+- The **analytics live inside the widget**: when the deployed GOA console is
+  reachable, `/api/counts` drops `total_active` into the outcome slot,
+  `/api/agents` fills the machinery roster, and `/api/activity` feeds the
+  expanded activity band. The badge gains a `LIVE` legend line. Offline, the
+  simulated values stay put — the chart never breaks.
+- **Status state machine**: the agent rests in Standby; a reachable console
+  wakes it to Working, and on a selected/expanded card the status is
+  **tap-to-activate** for demonstrations.
+- The bottom bar (**Open human workspace**) opens ONLY the human review
+  workspace — the de-duplicated leads queue (9.2 review screen,
+  `?embed=queue` hides the console's global nav) — as a **slide-up panel**
+  over the surface with a "Back to the surface" way home.
+- Engine, Data Contract v1.0 binding, and the backend are untouched.
 
-Edit those two dicts if the grouping or prototype status changes.
-
-## View it
-
-Double-click `index.html`. If your browser blocks the local `tree.data.js` include
-over `file://`, serve the folder instead:
+## Regenerate after the naming tree changes
 
 ```bash
-python -m http.server
-# then open http://localhost:8000/agents/bisd/org-chart/
+python3 generate_data.py     # reads naming_tree.txt, splices window.DATA
 ```
 
-## Notes for the developer
+## View locally
 
-- All 34 functions are **dormant** (`is_active: false`) until each clears the
-  8-phase build pipeline. The chart reflects that state truthfully.
-- The Gross Opportunity prototype cell is **live**: its "Open →" opens the
-  deployed console (https://goa-console-1059272334202.us-central1.run.app/) and
-  the active/new numbers are fetched from `/api/counts` every 30s (CORS-enabled
-  GET). The header badge flips SIMULATED → LIVE on first successful fetch; if
-  the API is unreachable the `sim` placeholder numbers stay, so the chart never
-  breaks offline. Configured in `generate_tree.py` → `PROTO[...].live_api`.
-- Design tokens (colors, Inter + IBM Plex Mono) match the Gross Opportunity
-  review-screen prototype so the two surfaces read as one system.
-- This is a static visualization. To make it live, replace the generated
-  `tree.data.js` with an API call that returns the same tree shape, and swap the
-  simulated metrics for real per-function telemetry.
+Double-click `index.html` (fully self-contained), or:
+
+```bash
+python -m http.server        # http://localhost:8000/agents/bisd/org-chart/
+```
+
+## Deploy
+
+```bash
+gcloud storage cp index.html gs://isrds-bisd-org-chart/index.html
+# live at https://storage.googleapis.com/isrds-bisd-org-chart/index.html
+```

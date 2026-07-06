@@ -150,8 +150,11 @@ button.risk{color:var(--risk);border-color:#e0b9b2}
 .agentlog{border-top:1px solid var(--line);height:37%;min-height:150px;display:flex;flex-direction:column;background:var(--card);flex-shrink:0}
 .agentlog .alhead{display:flex;align-items:center;gap:8px;padding:6px 18px;border-bottom:1px solid var(--line);font-size:11.5px;color:var(--muted);flex-shrink:0}
 .agentlog .alfeed{flex:1;overflow-y:auto;font-family:var(--mono);font-size:11.5px}
+/* embed=queue: the human review workspace only -- no global nav (9.1 note) */
+html.embed .top{display:none}
 </style>
 </head><body>
+<script>if(new URLSearchParams(location.search).get("embed")==="queue")document.documentElement.classList.add("embed");</script>
 <div class="top">
   <div class="mark">GOA</div>
   <div>

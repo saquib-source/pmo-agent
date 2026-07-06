@@ -101,7 +101,7 @@ gcloud run jobs create goa-daily-delta --image <console image> --region us-centr
   --set-env-vars ... --set-secrets ...   # same as service
 gcloud scheduler jobs create http goa-daily-delta-trigger --location us-central1 \
   --schedule "30 0 * * *" --time-zone Etc/UTC --http-method POST \
-  --uri "https://run.googleapis.com/apis/run.googleapis.com/v1/namespaces/isr-division-systems-488723/jobs/goa-daily-delta:run" \
+  --uri "https://us-central1-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/isr-division-systems-488723/jobs/goa-daily-delta:run" \
   --oauth-service-account-email 1059272334202-compute@developer.gserviceaccount.com
 ```
 

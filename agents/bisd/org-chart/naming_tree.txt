@@ -1,0 +1,134 @@
+Basco Installed Sales Division
+    Leadership
+        Strategic Foundation Delivery
+        Executive Bonus & Equity Policy Delivery
+        Maniacal Delivery
+        EASS-IPV-ROI Delivery
+        Executive Operations Support Delivery
+    Demand Generation
+        B2B Partner Acquisition Delivery
+        Through-Channel Partner Acquisition Delivery (B2B2B)
+        Through-Channel Marketing Automation (TCMA) Delivery
+        Partner Relationship Management (PRM) Delivery
+        Co-op Member Lead Generation Delivery
+        Point-of-Purchase Integration Delivery
+        Brand Delivery
+        Skunk Works Delivery
+        Research Delivery
+        Projects
+            Brand And Product Leadership
+                Competitive Intelligence
+                Product Differentiation
+                Product Invention
+                Patent Intelligence
+                Cost Competitiveness
+                Delivery-Speed Advantage
+                Warranty Strength
+                Equivalence Proof
+                Reputation Management
+                Findability
+            Influence Demand
+                Decision-Maker Influence
+                Specification Inclusion
+                Early Project Discovery
+                Brand-Standard Inclusion
+                Buyer Experience Center
+            Opportunity Pipeline
+                Gross Opportunity Agent Capability
+                The Pre-Bidder
+                Bid and Submission Agent Capability
+                Counterparty Credit Clearance
+            Pipeline And Margin Oversight
+                Pipeline and Margin Oversight
+            Turn A Win Into A Shipment
+                Order Realization
+                Drawing Approval
+                Field Measurement
+                Door Production
+                Division 10 Procurement
+                Consolidated Shipment
+            Stand Up The Install
+                Installer Coverage
+                Install-or-Furnish Decision
+                Labor Pricing
+                Licensing Compliance
+                Insurance Compliance
+            Install And Sign Off
+                Install Execution
+                Punch Closure
+                Completion Sign-Off
+            Get Paid And Close Out
+                Installer Payment
+                Penalty Avoidance
+                Billing and Collections
+                Closeout and Retainage Release
+                Warranty Administration
+    People and Agent Supply
+        Talent & Agent Strategy / Sociotechnical Architecture Delivery
+        Sociotechnical Organizational Charting Delivery
+        Direct Acquisition Delivery (Humans and Agents)
+        Credentialing & Background Verification Delivery
+        Contracting & Entry Delivery
+        Orientation & Onboarding Delivery
+        Training (LMS + Integrated UI + Hands-On) Delivery
+        Testing & Verification Delivery
+        Partner-Integrated Onboarding & Downstream Orientation Delivery
+        Off-Boarding (Cross-Group) Delivery
+        Meeting Governance Delivery
+        Swag Store Delivery
+        Townhalls Delivery
+        Performance Reviews & Awards Delivery
+    Product and Service Supply
+        PSKU Management Delivery
+        Service Translation & SSKU Management Delivery
+        PSKU/SSKU Mapping Delivery
+        Service Pricing Delivery
+        License Determination Delivery
+        Network Architecture Delivery
+        Product/Service Vendor Integration (Light-Touch / High-Volume) Delivery
+        Product/Service Vendor Account Setup (Heavy-Duty / Real Accounts) Delivery
+        Shipping & Vendor Selection Logic Delivery
+    Order Management
+        Demand Capture & Conversion Delivery
+        Appointment Protection Delivery
+        Sourcing & Production Coordination Delivery
+        Inbound Logistics & Arrival Verification Delivery
+        Multi-Party Engagement During Wait Delivery
+        Dispatch & Field Verification Delivery
+        On-Site Service Execution Delivery
+        Closing Events Delivery
+        Permit Management Delivery
+    Infrastructure
+        Human Resources Delivery
+        Finance Delivery
+        Legal Delivery
+        Information Technology Delivery
+        Vendor Lifecycle Governance Delivery
+        Productivity Delivery
+        Security Delivery
+        Facilities & Equipment Delivery
+        Capital & Investor Operations Delivery
+    Technology and Systems
+        Product Strategy & Architecture Delivery
+        Legacy Business System Operations Delivery
+        Current Business System Engineering Delivery
+        Agentic Business System Engineering Delivery
+        Unconfigured Capability Engineering Delivery
+        Shell Architecture & Cross-Cutting Platforms Delivery
+        AI/Tech Radar Delivery
+        Developer Enablement Delivery
+        Application Administration & User Support Delivery
+        Backend Engineering & APIs Delivery
+        Release Management & Code Governance Delivery
+        Cloud Infrastructure & DevSecOps Delivery
+        Business System Maintenance & Support Delivery
+        Leadership Exception Handling Delivery
+        Demand Generation Exception Handling Delivery
+        People and Agent Supply Exception Handling Delivery
+        Product and Service Supply Exception Handling Delivery
+        Order Management Exception Handling Delivery
+        Infrastructure Exception Handling Delivery
+        Technology and Systems Exception Handling Delivery
+        Exception Operations Platform & Dashboard Delivery
+        Exception Handler Training & Career Development Delivery
+
