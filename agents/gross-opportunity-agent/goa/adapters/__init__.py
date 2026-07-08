@@ -2,16 +2,21 @@ from .base import Adapter
 from .rest_adapter import RestAdapter
 from .alert_email_adapter import AlertEmailAdapter
 from .inbound_push_adapter import InboundPushAdapter
+from .file_drop_adapter import FileDropAdapter
 from .sam_gov import SamGovAdapter
 
 _METHOD_MAP = {
     "rest": RestAdapter,
     "alert_email": AlertEmailAdapter,
     "inbound_push": InboundPushAdapter,
+    "file_drop": FileDropAdapter,
 }
 
 _SOURCE_MAP = {
     "sam_gov": SamGovAdapter,
+    # for_source() falls back to RestAdapter, so file-drop sources must be
+    # pinned here explicitly (the orchestrator consults for_source first).
+    "emailed_bid_leads": FileDropAdapter,
 }
 
 

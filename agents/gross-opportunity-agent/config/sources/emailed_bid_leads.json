@@ -1,0 +1,23 @@
+{
+  "_comment": "Emailed bid leads (BAS-5): keyword-alert invitations from the Group 1 portals (PlanHub, BuildingConnected, BidNet Direct) transcribed by Meri into ISRDS_Bid_Requests_Inbox.xlsx. Parsed to deterministic raw records by scripts/parse_bas5_inbox.py; ingested by FileDropAdapter through the full pipeline (normalize → dedup → gate → commit). Unknown fields stay null per Data Contract v1.0. Replace with AlertEmailAdapter (IMAP) once the shared-mailbox credentials land.",
+  "source_id": "emailed_bid_leads",
+  "name": "Emailed Bid Leads (BAS-5)",
+  "method": "file_drop",
+  "records_path": "config/sources/data/emailed_bid_leads.json",
+  "watermark_field": null,
+  "rate_limit": {},
+  "field_map": {
+    "project_name": "project_name",
+    "owner": "owner_company",
+    "valuation": null,
+    "bid_date": "bid_due_iso",
+    "primary_source_url": null,
+    "source_record_id": "source_record_id",
+    "record_type": "record_type",
+    "street": null,
+    "city": "city",
+    "state": "state",
+    "postal_code": null,
+    "country": null
+  }
+}

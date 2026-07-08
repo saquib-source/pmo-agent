@@ -21,7 +21,7 @@
   },
   "query_plan": {
     "_comment": "Each keyword = 1 search = usually 1 request at limit=1000. Each NAICS code = 1 more search. Budget math: len(keywords)+len(naics) searches/run must fit inside requests_per_day - reserve_for_ui. At 10/day keep <=5 searches; at 1,000/day you can list every keyword and NAICS you want.",
-    "keywords": ["partition", "shower", "restroom renovation"],
+    "keywords": ["partition", "shower", "restroom renovation", "glazing", "bathroom"],
     "naics": [],
     "_naics_candidates_when_quota_raised": ["238390 Other Building Finishing Contractors (toilet partitions install)", "236220 Commercial and Institutional Building Construction", "332323 Ornamental & Architectural Metal Work Mfg", "238150 Glass and Glazing Contractors (shower doors/enclosures)"]
   },
