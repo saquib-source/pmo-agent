@@ -1,6 +1,6 @@
 """
 Firestore store — append-only activity stream.
-Collection: live/projects/gross_opportunity/activity/{event_id}
+Collection: projects/gross_opportunity/activity (docs = {event_id})
 The review screen subscribes to this for the live activity ticker.
 Gap: GCP project id.
 """
@@ -13,7 +13,10 @@ from typing import Literal
 log = logging.getLogger(__name__)
 
 _PROJECT = os.environ.get("GOOGLE_CLOUD_PROJECT")
-_COLLECTION = "live/projects/gross_opportunity/activity"
+# Firestore collection paths must have an ODD number of segments
+# (collection/doc/collection). The previous 4-segment path was rejected on
+# every write ("A collection must have an odd number of path elements").
+_COLLECTION = os.environ.get("GOA_ACTIVITY_COLLECTION", "projects/gross_opportunity/activity")
 # GOA_SKIP_ACTIVITY=1 disables the Firestore ticker (for local runs where the
 # Firestore gRPC client is proxy-blocked). The activity stream is a UI nicety, not
 # part of the serving path. Unset in production (Cloud Run).
