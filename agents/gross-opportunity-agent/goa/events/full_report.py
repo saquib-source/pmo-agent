@@ -76,6 +76,7 @@ async def _pull_full_report_job(opportunity_id: str) -> None:
     try:
         full_record: dict = {}
         all_variants: list[dict] = []
+        fetched_any = False
         for link in source_links:
             cfg = configs.get(link["source_name"])
             if cfg is None:
@@ -103,6 +104,7 @@ async def _pull_full_report_job(opportunity_id: str) -> None:
 
             try:
                 full, variants = adapter.fetch_full(link.get("source_record_id", ""))
+                fetched_any = True
                 full_record.update(full)
                 all_variants.extend([{**v, "source_name": link["source_name"]} for v in variants])
                 await cloudsql.log_activity(
@@ -115,6 +117,16 @@ async def _pull_full_report_job(opportunity_id: str) -> None:
             finally:
                 if adapter.requests_made:
                     await cloudsql.record_requests_used(source_id, adapter.requests_made)
+
+        if not fetched_any:
+            # No source on this record supports on-demand retrieval (e.g. emailed
+            # leads — SR-1 pending). Say so honestly instead of claiming success
+            # with an empty report.
+            msg = ("None of this record's sources support on-demand full-record "
+                   "retrieval yet — pending specification SR-1 (mixed-source full reports)")
+            await cloudsql.log_activity(
+                "fetch_full", msg, opportunity_id=opportunity_id, level="warn")
+            raise RuntimeError(msg)
 
         await cloudsql.merge_full_record(opportunity_id, full_record)
         await cloudsql.add_spec_variants(opportunity_id, all_variants)

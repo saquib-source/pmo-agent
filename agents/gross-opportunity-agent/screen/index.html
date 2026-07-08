@@ -451,6 +451,7 @@ function renderDetail(d){
     <div class="sechead">Full RFP report</div>
     <div class="field"><label>fetch_state <span class="klabel">fetch_state</span></label>
       <span class="fetchstate fs-${fs}">${fs}</span></div>
+    ${fs==='failed'&&d.fetch_error?`<div class="d" style="color:var(--risk);font-size:11.5px;margin:4px 0 2px">${esc(jobj(d.fetch_error).message||'full-report pull failed')}</div>`:''}
     <div class="actions">
       <button class="primary" id="btnFull" ${fs==='pulling'?'disabled':''}>${d.full_record?'Re-pull full report':'Pull full report from SAM.gov'}</button>
     </div>

@@ -72,7 +72,11 @@ async def classify(opp: Any, scope: dict) -> dict:
         return {"passed": passed, "score": score, "reason": result.get("reason", ""), "engine": "model"}
     except Exception as e:
         log.warning("Gate classifier failed (%s) — keeping record (recall-first): %s", e, opp.opportunity_id)
-        return {"passed": True, "score": _KEEP_THRESHOLD, "reason": f"classifier error, kept (recall-first): {e}", "engine": "fallback"}
+        # Reviewer-facing reason stays neutral: no raw exception text or vendor
+        # strings on client surfaces. The full error is in the warning log above.
+        return {"passed": True, "score": _KEEP_THRESHOLD,
+                "reason": "classifier unavailable — kept for human review (recall-first policy)",
+                "engine": "fallback"}
 
 
 async def evaluate_with_classifier(opp: Any, rule_result: dict, scope: dict) -> dict:
