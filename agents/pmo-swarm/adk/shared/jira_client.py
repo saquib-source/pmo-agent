@@ -411,7 +411,7 @@ def add_comment_adf(issue_key: str, text: str, assignee_name: str = None,
                                  "content": [{"type": "text", "text": para.strip()}]})
 
     content.append({"type": "paragraph", "content": [
-        {"type": "text", "text": "— Danielle, PMO Execution Lead", "marks": [{"type": "em"}]}
+        {"type": "text", "text": "— Delivery Agent", "marks": [{"type": "em"}]}
     ]})
 
     result = jira_request("POST", f"/issue/{issue_key}/comment",

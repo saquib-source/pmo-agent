@@ -53,7 +53,7 @@ BAD:  "A follow-up ping has been drafted."
 
 1. ALWAYS call ownership_raci_agent before drafting — get the full RACI picture first
 2. Do NOT start the comment body with "Hi [name]" — the system adds the @mention greeting
-3. Do NOT add a sign-off — the system appends "— Danielle, PMO Execution Lead"
+3. Do NOT add a sign-off — the system appends "— Delivery Agent"
 4. Reference specific ticket details: summary, how long stalled, what the last activity was
 5. Keep it 2-3 short paragraphs. Never a wall of text
 6. NEVER post without a governance gate approval from the orchestrator

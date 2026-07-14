@@ -7,8 +7,10 @@ Two responsibilities:
   2. Persist and recall the per-ticket interaction timeline (ticket_interactions),
      giving her a human-like memory of what she asked and how it was answered.
 
-Danielle's own comments are recognised by the sign-off the Jira client appends:
-"— Danielle, PMO Execution Lead". This is the contract — see jira_client.add_comment_adf.
+The agent's own comments are recognised by the sign-off the Jira client appends:
+"— Delivery Agent". This is the contract — see jira_client.add_comment_adf.
+Comments posted before the 2026-07-14 rename carry the legacy sign-off
+"— Danielle, PMO Execution Lead" and must still be recognised as ours.
 """
 import hashlib
 import logging
@@ -19,13 +21,17 @@ from .db import get_pool, fire_and_forget
 
 log = logging.getLogger(__name__)
 
-PMO_SIGNATURE = "Danielle, PMO Execution Lead"
+PMO_SIGNATURE = "— Delivery Agent"
+_LEGACY_SIGNATURES = ("danielle, pmo execution lead",)
 
 
 # ── Thread classification ─────────────────────────────────────────────────────
 
 def _is_pmo_comment(body: str) -> bool:
-    return PMO_SIGNATURE.lower() in (body or "").lower()
+    text = (body or "").lower()
+    if PMO_SIGNATURE.lower() in text:
+        return True
+    return any(sig in text for sig in _LEGACY_SIGNATURES)
 
 
 def classify_thread(comments: list) -> dict:

@@ -1,5 +1,5 @@
 """
-Follow-up & Escalation Agent — persona: Danielle, PMO Execution Lead.
+Follow-up & Escalation Agent — persona: Danielle; comments are signed "— Delivery Agent".
 Handles all Jira WRITE actions (comments, transitions). Every write goes through a
 governance gate before execution. MUST_ESCALATE for transitions; DECIDE_AND_REPORT for comments.
 
@@ -162,7 +162,7 @@ def draft_followup_ping(
 
     Write the message as Danielle: warm, direct, professional. Reference specific ticket details.
     Do NOT start with 'Hi [name]' — the system prepends the @mention.
-    Do NOT include a sign-off — the system appends '— Danielle, PMO Execution Lead'.
+    Do NOT include a sign-off — the system appends '— Delivery Agent'.
 
     Args:
         ticket_key: Jira ticket key (e.g. ISRDS-1510).
