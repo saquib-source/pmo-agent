@@ -1,30 +1,27 @@
 """
-Hygiene Agent
-Role: polices Jira ticket hygiene — correct issue type, project, Epic linkage,
-time estimates, and due dates. Surfaces violations and triggers follow-up notifications
-for the responsible party. DECIDE_AND_REPORT.
+Hygiene Agent — REPORT-ONLY.
+Role: scans Jira ticket hygiene (assignee, time estimate, due date) and surfaces
+findings to the orchestrator for the Operating Brief. It NEVER messages ticket
+owners — housekeeping comments ("wrong type", "missing Epic link", "add an
+estimate") are disabled by owner decision, 2026-07-14. Issue type and Epic
+linkage are not policed at all.
 
 Inter-agent wiring:
   ← called by: orchestrator
-  → calls:     follow_up_agent to notify ticket owners of violations
-               follow_up will call ownership_raci internally to identify the right recipient
+  → calls:     nobody (no follow_up handoff — findings are internal only)
 """
 import os
 from pathlib import Path
 
 from google.adk.agents import LlmAgent
 from google.adk.tools import FunctionTool
-from google.adk.tools.agent_tool import AgentTool
 
 from ..shared import jira_client as jc
 from ..shared.governance import trust_ledger_log
-from .follow_up import follow_up_agent
 
 _PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "hygiene.md"
 _PROMPT = _PROMPT_PATH.read_text() if _PROMPT_PATH.exists() else "You are the PMO Hygiene agent."
 MODEL = os.environ.get("AGENT_MODEL", "gemini-2.5-flash")
-
-_EXPECTED_TYPE = jc.HYGIENE_ISSUE_TYPE  # "Configured Component"
 
 
 # ── Tools ────────────────────────────────────────────────────────────────────
@@ -32,18 +29,19 @@ _EXPECTED_TYPE = jc.HYGIENE_ISSUE_TYPE  # "Configured Component"
 def check_issue_hygiene(issue_key: str) -> dict:
     """Check a single ticket against PMO hygiene standards.
 
-    Checks:
-      - Issue type is 'Configured Component'
-      - Has an Epic (parent) link
+    Checks (internal reporting only — never messaged to ticket owners):
       - Has an assignee
       - Has time estimate (originalEstimate)
       - Has a due date
+
+    Issue type and Epic link are intentionally NOT checked — do not report
+    or message about them.
 
     Args:
         issue_key: Jira ticket key (e.g. ISRDS-1510).
     """
     data = jc.jira_request("GET", f"/issue/{issue_key}", params={
-        "fields": "summary,issuetype,parent,assignee,timeoriginalestimate,duedate,project"
+        "fields": "summary,issuetype,assignee,timeoriginalestimate,duedate,project"
     })
     if "error" in data:
         return data
@@ -52,11 +50,6 @@ def check_issue_hygiene(issue_key: str) -> dict:
     violations = []
 
     issue_type = (fields.get("issuetype") or {}).get("name", "")
-    if issue_type != _EXPECTED_TYPE:
-        violations.append(f"Wrong type: '{issue_type}' (expected '{_EXPECTED_TYPE}')")
-
-    if not fields.get("parent"):
-        violations.append("No Epic link (parent field empty)")
 
     if not fields.get("assignee"):
         violations.append("No assignee")
@@ -105,14 +98,12 @@ def scan_hygiene(project: str = "", max_results: int = 50) -> dict:
         jql = f'project = "{proj}" AND {elig} ORDER BY priority DESC'
 
     result = jc.run_jql(jql, max_results, extra_fields=[
-        "timeoriginalestimate", "duedate", "parent",
+        "timeoriginalestimate", "duedate",
     ])
     if "error" in result:
         return result
 
     violations_by_type = {
-        "wrong_type":        [],
-        "no_epic":           [],
         "no_assignee":       [],
         "no_estimate":       [],
         "no_due_date":       [],
@@ -120,10 +111,6 @@ def scan_hygiene(project: str = "", max_results: int = 50) -> dict:
 
     for issue in result["issues"]:
         key = issue["key"]
-        if issue.get("issue_type") != _EXPECTED_TYPE:
-            violations_by_type["wrong_type"].append(key)
-        if not issue.get("epic_link"):
-            violations_by_type["no_epic"].append(key)
         if not issue.get("assignee"):
             violations_by_type["no_assignee"].append(key)
 
@@ -143,9 +130,8 @@ hygiene_agent = LlmAgent(
     tools=[
         FunctionTool(check_issue_hygiene),
         FunctionTool(scan_hygiene),
-        # After finding violations, notify the responsible person via Follow-up.
-        # Follow-up will call ownership_raci to find the right recipient before posting.
-        AgentTool(follow_up_agent),
+        # REPORT-ONLY: no follow_up_agent here. Hygiene findings must never turn
+        # into comments to ticket owners (owner decision, 2026-07-14).
     ],
     output_key="response",
 )

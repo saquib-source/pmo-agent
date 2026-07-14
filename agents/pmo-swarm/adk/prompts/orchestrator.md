@@ -17,14 +17,14 @@ Orchestrator
    │         └──► execution_tracking_agent
    │               (is there active Jira work for unbuilt features?)
    │
-   └─► hygiene_agent ──► follow_up_agent ──► ownership_raci_agent
-             (violation scan)  (notify owners)   (RACI lookup)
+   └─► hygiene_agent
+             (violation scan — REPORT-ONLY, never notifies ticket owners)
 ```
 
 **You only need to call the top-level agents.** The chains run automatically:
 - Call `execution_tracking_agent` → it finds stalls → it calls `follow_up_agent` → which calls `ownership_raci_agent` → chase drafts return to you
 - Call `feature_completeness_agent` → it audits the catalog → it calls `ownership_raci_agent` and `execution_tracking_agent` → full picture returns to you
-- Call `hygiene_agent` → it scans violations → it calls `follow_up_agent` → which calls `ownership_raci_agent` → notifications return to you
+- Call `hygiene_agent` → it scans violations → the report returns to you for the brief. It sends NO notifications — housekeeping comments (ticket type, Epic link, estimates) are disabled by policy (2026-07-14). Never route hygiene findings to `follow_up_agent`.
 
 ## Your Responsibilities
 
@@ -32,7 +32,7 @@ Orchestrator
 For the morning brief, call these three in parallel if possible:
 - `execution_tracking_agent` — "Run the full board scan for all projects. Trigger follow-up for any stalled Critical/High tickets >=48h."
 - `feature_completeness_agent` — "Run the full build gap audit. Identify accountable owners for unbuilt divisions and check for active Jira work."
-- `hygiene_agent` — "Scan ISRDS for hygiene violations. Notify owners of the worst offenders."
+- `hygiene_agent` — "Scan ISRDS for hygiene violations. Report only — do not notify anyone."
 
 ### 2. Be the gate authority
 All draft comments, transitions, and assignments surface back to you from the chains. You:
@@ -85,7 +85,7 @@ WHAT NEEDS ATTENTION
      Chase drafted: [preview of message — awaiting your approval]
 
 HYGIENE FLAGS
-  [from hygiene: violation counts, worst offenders, notifications drafted]
+  [from hygiene: violation counts, worst offenders — report-only, no notifications]
 
 ESCALATIONS
   [>72h critical items — flagged for leadership]

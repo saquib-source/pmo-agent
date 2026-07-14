@@ -186,7 +186,8 @@ def _build_brief_prompt(mode: str = "full") -> str:
         f"1. Scan all boards for active and stalled work. "
         f"2. Check feature build completion. "
         f"3. Run a RACI gap check. "
-        f"4. Run a hygiene scan. "
+        f"4. Run a hygiene scan (report-only — never draft or send hygiene/housekeeping "
+        f"comments about ticket type, Epic links, estimates, or due dates). "
         f"{auto_chase_instruction} "
         f"Synthesise everything into the Operating Brief."
     )

@@ -4,7 +4,9 @@ Handles all Jira WRITE actions (comments, transitions). Every write goes through
 governance gate before execution. MUST_ESCALATE for transitions; DECIDE_AND_REPORT for comments.
 
 Inter-agent wiring:
-  ← called by: execution_tracking_agent (stalled tickets), hygiene_agent (violations)
+  ← called by: execution_tracking_agent (stalled tickets). Hygiene is report-only and
+               no longer hands off here — housekeeping/field-hygiene comments are
+               disabled by owner decision, 2026-07-14.
   → calls:     ownership_raci_agent (ALWAYS before drafting — needs Accountable/Responsible to @mention correctly)
 """
 import asyncio
