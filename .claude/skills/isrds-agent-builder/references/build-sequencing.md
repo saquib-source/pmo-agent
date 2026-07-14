@@ -24,6 +24,27 @@ If a requirement arrives for a third+ agent and the swarm isn't stood up yet, **
 confirm** with the user. Either it's genuinely the third proving build, or the swarm work should
 start. Don't quietly hand-build agent four.
 
+## Agent Tier Taxonomy (what "Tier" means)
+
+Tier is an **architecture class** — statefulness, coordination, and decision authority — not a
+risk/blast-radius label. Every agent is exactly one of:
+
+- **Tier 1 — Stateless single-task agent.** A specialist with one skill. Triggered, does one job,
+  writes findings to the Trust Ledger, terminates. No memory between runs (or light pgvector
+  memory); no coordination with other agents.
+- **Tier 2 — Sequential workflow agent.** A specialist who owns an end-to-end process. Maintains
+  context across turns within a session (session memory + pgvector for cross-session continuity);
+  each step depends on the previous step's output. No real-time peer coordination, but its output
+  feeds other agents.
+- **Tier 3 — Autonomous role agent (Configured Swarm).** A department head over a department. Not
+  one agent but a named, orchestrated set of Role Categories with persistent identity across days
+  and sessions; exercises all three decision classes (including **Must Escalate**). Replaces a
+  50–100 person operation.
+
+Portfolio: **PMO Agent** and **GOA** are **Tier 2** (sequential ingest→normalize→dedup→gate→serve
+pipelines with session+pgvector memory whose output feeds humans/other agents). The **Swarm
+Builder** is the **Tier 3** target.
+
 ## Why these two agents (the selection criterion)
 
 Proving-agent selection is **maximum runtime-layer coverage at minimum blast radius** — *not*

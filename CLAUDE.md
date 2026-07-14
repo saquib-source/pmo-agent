@@ -27,6 +27,15 @@ config_registry.resolve(tenant_id, agent_id)  # Returns model, tools, guardrails
 
 This is the **core IP** of ISRDS. Breaking this makes agents legacy debt, not swarm-compatible.
 
+### Agent Tier Taxonomy (the architectural classification)
+Every agent is one of three tiers. Tier is an **architecture class** (statefulness + coordination + decision authority) — *not* a risk/blast-radius label. It determines memory surface, orchestration, and which decision classes the agent may exercise.
+
+- **Tier 1 — Stateless single-task agent.** *A specialist with one skill.* Triggered, does one job, writes findings to the Trust Ledger, and terminates. No memory between runs (or light pgvector memory). No coordination with other agents.
+- **Tier 2 — Sequential workflow agent.** *A specialist who owns an end-to-end process.* Maintains context across multiple turns within a session (session memory + pgvector for cross-session continuity); each step depends on the previous step's output. Does not coordinate with other agents in real time, but its output feeds them.
+- **Tier 3 — Autonomous role agent (Configured Swarm).** *A department head overseeing a department.* Not one agent but a named, orchestrated set of Role Categories with persistent identity across days and sessions. Exercises all three decision classes (including **Must Escalate** for high-stakes decisions). Replaces the equivalent of a 50–100 person operation.
+
+Portfolio placement: **PMO Agent** and **GOA** are **Tier 2** (sequential workflow: ingest → normalize → dedup → gate → serve, each step feeding the next; session + pgvector memory; output feeds humans/other agents, no real-time peer coordination). The **Swarm Builder** is the **Tier 3** target.
+
 ### Build Pipeline
 Agents go through **8 phases** with 6 human gates. See `.claude/skills/isrds-agent-builder/references/build-sequencing.md` for the sequencing doctrine.
 
