@@ -36,7 +36,7 @@ gcloud run deploy "$SERVICE" \
   --region="$REGION" --project="$PROJECT" \
   --service-account="$SA_EMAIL" \
   --set-cloudsql-instances="$CLOUD_SQL_INSTANCE" \
-  --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT},GOOGLE_CLOUD_LOCATION=${REGION},PMO_JOB_NAME=pmo-swarm,CLOUD_SQL_INSTANCE=${CLOUD_SQL_INSTANCE},CLOUD_SQL_DATABASE=isrds_agentic,CLOUD_SQL_USER=postgres,TENANT_ID=isrds,JIRA_URL=https://lixillabs.atlassian.net,JIRA_EMAIL=saquib@isrdsystems.com" \
+  --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT},GOOGLE_CLOUD_LOCATION=${REGION},PMO_JOB_NAME=pmo-swarm,CLOUD_SQL_INSTANCE=${CLOUD_SQL_INSTANCE},CLOUD_SQL_DATABASE=isrds_agentic,CLOUD_SQL_USER=postgres,TENANT_ID=isrds,JIRA_URL=https://lixillabs.atlassian.net,JIRA_EMAIL=delivery.agent@isrdsystems.com" \
   --set-secrets="JIRA_API_TOKEN=jira-api-token:latest,CLOUD_SQL_PASSWORD=alloydb-password:latest" \
   --allow-unauthenticated \
   --memory=512Mi --cpu=1 --port=8080 \

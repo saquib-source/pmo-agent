@@ -72,7 +72,7 @@ if $DO_JOB; then
   ENV_VARS+=",GOOGLE_GENAI_USE_VERTEXAI=TRUE"
   ENV_VARS+=",AGENT_MODEL=gemini-2.5-flash"
   ENV_VARS+=",JIRA_URL=https://lixillabs.atlassian.net"
-  ENV_VARS+=",JIRA_EMAIL=saquib@isrdsystems.com"
+  ENV_VARS+=",JIRA_EMAIL=delivery.agent@isrdsystems.com"
   ENV_VARS+=",JIRA_PROJECT=ISRDS"
   ENV_VARS+=",JIRA_PROJECTS=ALL"   # ALL = live-discover every project the token can see
   ENV_VARS+=",JIRA_SPRINT_FIELD=customfield_10007"
