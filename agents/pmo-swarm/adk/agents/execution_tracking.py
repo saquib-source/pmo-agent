@@ -21,7 +21,8 @@ from .follow_up import follow_up_agent
 
 _PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "execution_tracking.md"
 _PROMPT = _PROMPT_PATH.read_text() if _PROMPT_PATH.exists() else "You are the PMO Execution Tracking agent."
-MODEL = os.environ.get("AGENT_MODEL", "gemini-2.5-flash")
+from ..shared.config_registry import adk_model
+MODEL = adk_model(os.environ.get("AGENT_MODEL", "gemini-2.5-flash"))
 
 
 # ── Tools ────────────────────────────────────────────────────────────────────

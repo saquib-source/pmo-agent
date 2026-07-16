@@ -118,6 +118,63 @@ def refresh() -> None:
 def get_agent_model() -> str:
     return str(get("agent_model", "gemini-2.5-flash"))
 
+def adk_model(name: str = ""):
+    """Resolved model wrapped for ADK with transport-level retries.
+
+    genai's built-in retry (HttpRetryOptions) covers 408/429/5xx plus
+    httpx.ConnectError/TimeoutException — but NOT httpx.ReadError (a dropped
+    keep-alive connection), which killed whole agent nodes in production
+    (2026-07-16). The subclass below retries any httpx.TransportError around
+    the non-streaming call; the streaming path is passed through untouched
+    (partial yields can't be safely retried).
+    Falls back to the plain name string if the installed ADK/genai don't
+    support this, preserving the previous behavior.
+    """
+    name = name or get_agent_model()
+    attempts = int(os.environ.get("PMO_LLM_RETRY_ATTEMPTS", "4"))
+    try:
+        import asyncio
+        import httpx
+        from google.adk.models import Gemini
+        from google.genai import types as genai_types
+
+        class _RetryingGemini(Gemini):
+            async def generate_content_async(self, llm_request, stream=False):
+                if stream:
+                    async for r in super().generate_content_async(llm_request, stream=True):
+                        yield r
+                    return
+                for attempt in range(1, attempts + 1):
+                    try:
+                        # Non-streaming yields exactly one final response, so
+                        # buffering before re-yielding is behavior-preserving.
+                        results = []
+                        async for r in super().generate_content_async(llm_request, stream=False):
+                            results.append(r)
+                        for r in results:
+                            yield r
+                        return
+                    except httpx.TransportError as e:
+                        if attempt == attempts:
+                            raise
+                        log.warning(
+                            f"LLM transport error ({type(e).__name__}: {e}) — "
+                            f"retrying request {attempt}/{attempts - 1}"
+                        )
+                        await asyncio.sleep(min(2 ** attempt, 30))
+
+        return _RetryingGemini(
+            model=name,
+            retry_options=genai_types.HttpRetryOptions(
+                attempts=attempts,
+                initial_delay=1.0,
+                exp_base=2.0,
+            ),
+        )
+    except Exception as e:
+        log.warning(f"adk_model: retry wrapper unavailable ({type(e).__name__}: {e}) — using plain model name")
+        return name
+
 def get_tenant_id() -> str:
     return str(get("tenant_id", "ashs"))
 

@@ -193,8 +193,32 @@ def _build_brief_prompt(mode: str = "full") -> str:
     )
 
 
+# A cycle normally takes ~2-5 min. If the ADK runner wedges (e.g. hung transport
+# cleanup after LLM connection errors), a timeout lets us cancel and retry instead
+# of blocking until Cloud Run's 30-min task timeout kills the container.
+CYCLE_TIMEOUT_MIN = int(os.environ.get("PMO_CYCLE_TIMEOUT_MINUTES", "20"))
+CYCLE_ATTEMPTS    = int(os.environ.get("PMO_CYCLE_ATTEMPTS", "3"))
+
+
+class CycleError(RuntimeError):
+    """All attempts of a PMO cycle failed — callers must treat the run as failed."""
+
+
+async def _run_prompt_guarded(prompt: str, session_id: str) -> str:
+    """_run_prompt with a hard timeout. On timeout, cancel the runner task; if
+    cancellation itself hangs (ADK cleanup bug), abandon the task and let the
+    caller retry — Cloud Run's task timeout remains the final backstop."""
+    task = asyncio.ensure_future(_run_prompt(prompt, session_id))
+    done, _ = await asyncio.wait({task}, timeout=CYCLE_TIMEOUT_MIN * 60)
+    if task in done:
+        return task.result()  # re-raises the underlying error, if any
+    task.cancel()
+    await asyncio.wait({task}, timeout=30)
+    raise CycleError(f"cycle timed out after {CYCLE_TIMEOUT_MIN} min (runner hung)")
+
+
 async def run_cycle(mode: str = "full") -> str:
-    """Execute one full PMO swarm cycle."""
+    """Execute one full PMO swarm cycle. Raises CycleError after all attempts fail."""
     start = datetime.now(timezone.utc)
     session_id = f"daemon-{start.strftime('%Y%m%d%H%M%S')}"
 
@@ -218,16 +242,37 @@ async def run_cycle(mode: str = "full") -> str:
     log.info(f"🎯 Prompt (full): {prompt}")
     log.info("-" * 80)
 
-    # Layer 8 — trace the full swarm run in Cloud Logging + Monitoring
-    try:
-        with observability.trace_agent_run(
-            "pmo_swarm",
-            extra={"mode": mode, "session_id": session_id, "projects": JIRA_PROJECTS},
-        ):
-            response = await _run_prompt(prompt, session_id)
-    except Exception as e:
-        log.error(f"Orchestrator error: {type(e).__name__}: {e}")
-        return f"ERROR: {e}"
+    # Layer 8 — trace the full swarm run in Cloud Logging + Monitoring.
+    # Transient LLM transport errors (httpx ReadError etc.) or a hung runner fail
+    # a whole attempt — retry with a FRESH session rather than failing the run.
+    response = None
+    last_err: Exception | None = None
+    for attempt in range(1, CYCLE_ATTEMPTS + 1):
+        attempt_session = session_id if attempt == 1 else f"{session_id}-r{attempt}"
+        try:
+            with observability.trace_agent_run(
+                "pmo_swarm",
+                extra={"mode": mode, "session_id": attempt_session,
+                       "projects": JIRA_PROJECTS, "attempt": attempt},
+            ):
+                response = await _run_prompt_guarded(prompt, attempt_session)
+            break
+        except Exception as e:
+            last_err = e
+            log.error(
+                f"Orchestrator error (attempt {attempt}/{CYCLE_ATTEMPTS}): "
+                f"{type(e).__name__}: {e}"
+            )
+            if attempt < CYCLE_ATTEMPTS:
+                await asyncio.sleep(15 * attempt)  # let transient network issues clear
+
+    if response is None:
+        # Do NOT save an error string as the Operating Brief — mark the run failed
+        # so Cloud Run's retry/alerting sees a real failure.
+        raise CycleError(
+            f"PMO cycle failed after {CYCLE_ATTEMPTS} attempts: "
+            f"{type(last_err).__name__}: {last_err}"
+        ) from last_err
 
     elapsed = (datetime.now(timezone.utc) - start).total_seconds()
 
@@ -310,10 +355,18 @@ def run_daemon():
     asyncio.run(_loop())
 
 
+def _run_once_or_exit(mode: str) -> None:
+    try:
+        asyncio.run(_run_with_startup(mode))
+    except Exception as e:
+        log.error(f"PMO run failed: {type(e).__name__}: {e}")
+        sys.exit(1)  # real failure — let Cloud Run mark the execution failed & retry
+
+
 if __name__ == "__main__":
     if "--once" in sys.argv:
-        asyncio.run(_run_with_startup("full"))
+        _run_once_or_exit("full")
     elif "--brief" in sys.argv:
-        asyncio.run(_run_with_startup("brief_only"))
+        _run_once_or_exit("brief_only")
     else:
         run_daemon()

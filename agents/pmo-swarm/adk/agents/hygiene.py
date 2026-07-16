@@ -21,7 +21,8 @@ from ..shared.governance import trust_ledger_log
 
 _PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "hygiene.md"
 _PROMPT = _PROMPT_PATH.read_text() if _PROMPT_PATH.exists() else "You are the PMO Hygiene agent."
-MODEL = os.environ.get("AGENT_MODEL", "gemini-2.5-flash")
+from ..shared.config_registry import adk_model
+MODEL = adk_model(os.environ.get("AGENT_MODEL", "gemini-2.5-flash"))
 
 
 # ── Tools ────────────────────────────────────────────────────────────────────

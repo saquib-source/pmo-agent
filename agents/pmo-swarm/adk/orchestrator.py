@@ -18,7 +18,7 @@ from .agents.ownership_raci       import ownership_raci_agent
 from .agents.feature_completeness import feature_completeness_agent
 from .agents.hygiene              import hygiene_agent
 from .shared.governance           import trust_ledger_log, trust_ledger_read
-from .shared.config_registry      import get_agent_model, get_tenant_id
+from .shared.config_registry      import adk_model, get_tenant_id
 from .shared.observability        import log_event as obs_log
 from .shared.tool_registry        import registry as tool_registry
 from .shared.db                   import fire_and_forget
@@ -28,8 +28,9 @@ log = logging.getLogger(__name__)
 _PROMPT_PATH = Path(__file__).parent / "prompts" / "orchestrator.md"
 _PROMPT = _PROMPT_PATH.read_text() if _PROMPT_PATH.exists() else "You are the PMO Orchestrator."
 
-# Layer 1 — model pulled from Config Registry (Firestore → env fallback)
-MODEL = get_agent_model()
+# Layer 1 — model pulled from Config Registry (Firestore → env fallback),
+# wrapped with transport-level LLM retries (see config_registry.adk_model)
+MODEL = adk_model()
 
 
 # ── Orchestrator-level tools (cross-cutting, no skill agent owns these) ──────

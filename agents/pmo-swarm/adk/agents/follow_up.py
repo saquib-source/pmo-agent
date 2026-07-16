@@ -51,7 +51,8 @@ def _run_async(coro):
 
 _PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "follow_up.md"
 _PROMPT = _PROMPT_PATH.read_text() if _PROMPT_PATH.exists() else "You are Danielle, PMO Execution Lead."
-MODEL = os.environ.get("AGENT_MODEL", "gemini-2.5-flash")
+from ..shared.config_registry import adk_model
+MODEL = adk_model(os.environ.get("AGENT_MODEL", "gemini-2.5-flash"))
 
 
 # ── Tools ────────────────────────────────────────────────────────────────────
