@@ -77,32 +77,29 @@ def trust_ledger_log(entry_type: str, detail: str, agent_id: str = "pmo_swarm") 
     _obs_log(entry_type, detail, agent_id=agent_id)
 
 
+_PENDING_ACTIONS_DDL = """
+    CREATE TABLE IF NOT EXISTS pending_actions (
+      id            UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+      tenant_id     TEXT        NOT NULL,
+      swarm_id      TEXT        NOT NULL DEFAULT 'pmo-swarm',
+      agent_id      TEXT        NOT NULL,
+      action_type   TEXT        NOT NULL,   -- 'comment' | 'transition'
+      ticket_key    TEXT        NOT NULL,
+      assignee_name TEXT,
+      assignee_id   TEXT,
+      message       TEXT        NOT NULL,    -- the REAL, ready-to-post body
+      urgency       TEXT,
+      status        TEXT        NOT NULL DEFAULT 'pending',  -- pending|approved|declined
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      resolved_at   TIMESTAMPTZ,
+      resolved_by   TEXT
+    )
+"""
+
+
 async def _ensure_pending_actions_table() -> None:
-    from .db import get_pool
-    pool = await get_pool()
-    if pool is None:
-        return
-    async with pool.acquire() as conn:
-        await conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS pending_actions (
-              id            UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
-              tenant_id     TEXT        NOT NULL,
-              swarm_id      TEXT        NOT NULL DEFAULT 'pmo-swarm',
-              agent_id      TEXT        NOT NULL,
-              action_type   TEXT        NOT NULL,   -- 'comment' | 'transition'
-              ticket_key    TEXT        NOT NULL,
-              assignee_name TEXT,
-              assignee_id   TEXT,
-              message       TEXT        NOT NULL,    -- the REAL, ready-to-post body
-              urgency       TEXT,
-              status        TEXT        NOT NULL DEFAULT 'pending',  -- pending|approved|declined
-              created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-              resolved_at   TIMESTAMPTZ,
-              resolved_by   TEXT
-            )
-            """
-        )
+    from .db import ensure_schema_once
+    await ensure_schema_once("pending_actions", [_PENDING_ACTIONS_DDL])
 
 
 async def _insert_pending_action(

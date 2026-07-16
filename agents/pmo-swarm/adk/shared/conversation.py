@@ -99,39 +99,35 @@ def intent_hash(ticket_key: str, ask_kind: str, subject_terms: list = None) -> s
 
 # ── Interaction memory (ticket_interactions) ──────────────────────────────────
 
+_TICKET_INTERACTIONS_DDL = [
+    """
+    CREATE TABLE IF NOT EXISTS ticket_interactions (
+      id              UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+      tenant_id       TEXT        NOT NULL,
+      swarm_id        TEXT        NOT NULL DEFAULT 'pmo-swarm',
+      ticket_key      TEXT        NOT NULL,
+      event_type      TEXT        NOT NULL,
+      intent_hash     TEXT,
+      actor           TEXT,
+      actor_id        TEXT,
+      body            TEXT,
+      interpretation  TEXT,
+      decision        TEXT,
+      jira_comment_id TEXT,
+      metadata        JSONB       NOT NULL DEFAULT '{}'::jsonb,
+      created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_ticket_interactions_ticket "
+    "ON ticket_interactions (tenant_id, ticket_key, created_at DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_ticket_interactions_intent "
+    "ON ticket_interactions (tenant_id, ticket_key, intent_hash)",
+]
+
+
 async def _ensure_table() -> None:
-    pool = await get_pool()
-    if pool is None:
-        return
-    async with pool.acquire() as conn:
-        await conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS ticket_interactions (
-              id              UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
-              tenant_id       TEXT        NOT NULL,
-              swarm_id        TEXT        NOT NULL DEFAULT 'pmo-swarm',
-              ticket_key      TEXT        NOT NULL,
-              event_type      TEXT        NOT NULL,
-              intent_hash     TEXT,
-              actor           TEXT,
-              actor_id        TEXT,
-              body            TEXT,
-              interpretation  TEXT,
-              decision        TEXT,
-              jira_comment_id TEXT,
-              metadata        JSONB       NOT NULL DEFAULT '{}'::jsonb,
-              created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            )
-            """
-        )
-        await conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_ticket_interactions_ticket "
-            "ON ticket_interactions (tenant_id, ticket_key, created_at DESC)"
-        )
-        await conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_ticket_interactions_intent "
-            "ON ticket_interactions (tenant_id, ticket_key, intent_hash)"
-        )
+    from .db import ensure_schema_once
+    await ensure_schema_once("ticket_interactions", _TICKET_INTERACTIONS_DDL)
 
 
 async def _insert(tenant_id: str, ticket_key: str, event_type: str, **kw) -> None:
